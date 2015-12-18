@@ -1,0 +1,230 @@
+class GPU.SmoothRenderer {
+	enum Loop {
+		CLOSED
+		OPEN
+	}
+
+	const _format = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION4, .FLOAT, 4).add(GLSLX_NAME_COORD4, .BYTE, 4)
+	const _inside List<Vector> = []
+	const _materal Material = null
+	const _outside List<Vector> = []
+	const _vertices = DataArray.new
+	var _context Context = null
+	var _pixelScale = 1.0
+	var _pool BufferPool = null
+	var _previousColor = Color.TRANSPARENT
+	var _previousU = 0.0
+	var _previousV = 0.0
+	var _previousX = 0.0
+	var _previousY = 0.0
+
+	def new(context Context, pool BufferPool) {
+		_context = context
+		_pool = pool
+		_materal = context.createMaterial(_format, GLSLX_SOURCE_SMOOTH_PATH_VERTEX, GLSLX_SOURCE_SMOOTH_PATH_FRAGMENT)
+	}
+
+	def pixelScale double {
+		return _pixelScale
+	}
+
+	def setTransformAndPixelScale(transform Transform, pixelScale double) {
+		_materal.setUniformMat3(GLSLX_NAME_MATRIX3, transform)
+		_pixelScale = pixelScale
+	}
+
+	def flush {
+		var area = _pool.allocate(_format, _vertices.bytes)
+		if area != null {
+			_context.setPremultipliedBlendState
+			_context.draw(.TRIANGLE_STRIP, _materal, area)
+			_vertices.clear
+			area.free
+		}
+	}
+
+	def _loadPoints(rect Rect) {
+		_rectPoints[0].set(rect.left, rect.top)
+		_rectPoints[1].set(rect.right, rect.top)
+		_rectPoints[2].set(rect.right, rect.bottom)
+		_rectPoints[3].set(rect.left, rect.bottom)
+	}
+
+	def fillRect(rect Rect, color Color) {
+		_loadPoints(rect)
+		fillConvexPolygon(_rectPoints, color)
+	}
+
+	def strokeLine(rect Rect, color Color, thickness double) {
+		_loadPoints(rect)
+		strokeNonOverlappingPolyline(_rectPoints, color, thickness, .CLOSED)
+	}
+
+	def strokeLine(start Vector, end Vector, color Color, thickness double) {
+		_linePoints[0].set(start)
+		_linePoints[1].set(end)
+		strokeNonOverlappingPolyline(_linePoints, color, thickness, .OPEN)
+	}
+
+	def strokeLine(startX double, startY double, endX double, endY double, color Color, thickness double) {
+		_linePoints[0].set(startX, startY)
+		_linePoints[1].set(endX, endY)
+		strokeNonOverlappingPolyline(_linePoints, color, thickness, .OPEN)
+	}
+
+	def fillConvexPolygon(points List<Vector>, color Color) {
+		var inside = _inside
+		var outside = _outside
+
+		var n = points.count
+		if n < 3 {
+			return
+		}
+
+		color = color.premultiplied
+
+		# Reuse existing buffers to avoid extra allocations
+		while inside.count < n {
+			inside.append(Vector.new)
+			outside.append(Vector.new)
+		}
+
+		# Compute both rings of points
+		for i1 in 0..n {
+			var v0 = points[(i1 + n - 1) % n]
+			var v1 = points[i1]
+			var v2 = points[(i1 + 1) % n]
+			var n01x = v0.y - v1.y
+			var n01y = v1.x - v0.x
+			var n01 = _length(n01x, n01y)
+			var n12x = v1.y - v2.y
+			var n12y = v2.x - v1.x
+			var n12 = _length(n12x, n12y)
+			var n012x = n01x / n01 + n12x / n12
+			var n012y = n01y / n01 + n12y / n12
+			var scale = 0.5 * _pixelScale * n01 / (n01x * n012x + n01y * n012y)
+			var dx = n012x * scale
+			var dy = n012y * scale
+			outside[i1].set(v1.x - dx, v1.y - dy)
+			inside[i1].set(v1.x + dx, v1.y + dy)
+		}
+
+		# Fill the interior with a triangle strip
+		for i = 0, j = n - 1; i <= j; i++, j-- {
+			var vi = inside[i]
+			var vj = inside[j]
+			_appendVertex(vi.x, vi.y, 1, 1, color)
+			if i == 0 { _appendPreviousVertex }
+			if i < j { _appendVertex(vj.x, vj.y, 1, 1, color) }
+		}
+		_appendPreviousVertex
+
+		# Outline the edge with anti-aliasing
+		for i = 0; i <= n; i++ {
+			var j = i % n
+			var vi = inside[j]
+			var vo = outside[j]
+			_appendVertex(vo.x, vo.y, 0, 0, color)
+			if i == 0 { _appendPreviousVertex }
+			_appendVertex(vi.x, vi.y, 1, 1, color)
+		}
+		_appendPreviousVertex
+	}
+
+	def strokeNonOverlappingPolyline(points List<Vector>, color Color, thickness double, loop Loop) {
+		# Need to draw the line wider by one pixel for anti-aliasing
+		var aa = (thickness + _pixelScale) / _pixelScale
+		var halfWidth = (thickness + _pixelScale) / 2
+		var n = points.count
+		if n < 2 {
+			return
+		}
+
+		color = color.premultiplied
+
+		# Emit the start cap
+		if loop == .OPEN {
+			var v0 = points[0]
+			var v1 = points[1]
+			var dx = v1.x - v0.x
+			var dy = v1.y - v0.y
+			var d = _length(dx, dy)
+			var u = 0.5 * _pixelScale / d
+			var ux = dx * u
+			var uy = dy * u
+			var v = halfWidth / d
+			var vx = -dy * v
+			var vy = dx * v
+			_appendVertex(v0.x - ux - vx, v0.y - uy - vy, 0, -aa, color)
+			_appendPreviousVertex
+			_appendVertex(v0.x - ux + vx, v0.y - uy + vy, -aa, 0, color)
+			_appendVertex(v0.x + ux - vx, v0.y + uy - vy, 0, aa, color)
+			_appendVertex(v0.x + ux + vx, v0.y + uy + vy, aa, 0, color)
+		}
+
+		# Emit the joins between segments
+		var minJoin = loop == .CLOSED ? 0 : 1
+		var maxJoin = loop == .CLOSED ? n + 1 : n - 1
+		for i in minJoin..maxJoin {
+			var v0 = points[(i + n - 1) % n]
+			var v1 = points[i % n]
+			var v2 = points[(i + 1) % n]
+			var n01x = v0.y - v1.y
+			var n01y = v1.x - v0.x
+			var n01 = _length(n01x, n01y)
+			var n12x = v1.y - v2.y
+			var n12y = v2.x - v1.x
+			var n12 = _length(n12x, n12y)
+			var n012x = n01x / n01 + n12x / n12
+			var n012y = n01y / n01 + n12y / n12
+			var scale = halfWidth * n01 / (n01x * n012x + n01y * n012y)
+			var dx = n012x * scale
+			var dy = n012y * scale
+			_appendVertex(v1.x - dx, v1.y - dy, 0, aa, color)
+			if i == 0 { _appendPreviousVertex } # This only happens in the closed loop case
+			_appendVertex(v1.x + dx, v1.y + dy, aa, 0, color)
+		}
+
+		# Emit the end cap
+		if loop == .OPEN {
+			var v0 = points[n - 2]
+			var v1 = points[n - 1]
+			var dx = v1.x - v0.x
+			var dy = v1.y - v0.y
+			var d = _length(dx, dy)
+			var u = 0.5 * _pixelScale / d
+			var ux = dx * u
+			var uy = dy * u
+			var v = halfWidth / d, vx = -dy * v, vy = dx * v
+			_appendVertex(v1.x - ux - vx, v1.y - uy - vy, 0, aa, color)
+			_appendVertex(v1.x - ux + vx, v1.y - uy + vy, aa, 0, color)
+			_appendVertex(v1.x + ux - vx, v1.y + uy - vy, 0, -aa, color)
+			_appendVertex(v1.x + ux + vx, v1.y + uy + vy, -aa, 0, color)
+		}
+		_appendPreviousVertex
+	}
+
+	def _appendVertex(x double, y double, u double, v double, color Color) {
+		_previousX = x
+		_previousY = y
+		_previousU = u
+		_previousV = v
+		_previousColor = color
+		_vertices
+			.appendFloat(x).appendFloat(y).appendFloat(u).appendFloat(v)
+			.appendByte(color.red).appendByte(color.green).appendByte(color.blue).appendByte(color.alpha)
+	}
+
+	def _appendPreviousVertex {
+		_appendVertex(_previousX, _previousY, _previousU, _previousV, _previousColor)
+	}
+
+	def _length(x double, y double) double {
+		return Math.sqrt(x * x + y * y)
+	}
+}
+
+namespace GPU.SmoothRenderer {
+	const _rectPoints List<Vector> = [Vector.new, Vector.new, Vector.new, Vector.new]
+	const _linePoints List<Vector> = [Vector.new, Vector.new]
+}

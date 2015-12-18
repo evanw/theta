@@ -1,0 +1,520 @@
+if TARGET == .JAVASCRIPT {
+	@import {
+		const window HTMLWindow
+		const document HTMLDocument
+
+		def requestAnimationFrame(callback fn())
+
+		type Timeout = int
+		def setTimeout(callback fn(), milliseconds int) Timeout
+		def clearTimeout(timeout Timeout)
+
+		type Interval = int
+		def setInterval(callback fn(), milliseconds int) Interval
+		def clearInterval(interval Interval)
+
+		class Error {
+			def new(message string)
+		}
+
+		class FormData {
+			def append(name string, value string)
+			def append(name string, value string, filename string)
+		}
+
+		namespace URL {
+			def createObjectURL(blob Blob) string
+			def revokeObjectURL(url string)
+		}
+
+		class Blob {
+			const size int
+			const type string
+
+			def new(parts List<ArrayBuffer>)
+			def new(parts List<Uint8Array>)
+			def new(parts List<Blob>)
+			def new(parts List<string>)
+			def new(parts List<ArrayBuffer>, options dynamic)
+			def new(parts List<Uint8Array>, options dynamic)
+			def new(parts List<Blob>, options dynamic)
+			def new(parts List<string>, options dynamic)
+
+			def slice(start int) Blob
+			def slice(start int, end int) Blob
+			def slice(start int, end int, contentType string) Blob
+		}
+
+		class HTMLFile : Blob {
+			const name string
+			const lastModified double
+		}
+
+		class FileReader {
+			const readyState int
+			const error Error
+
+			# states
+			const EMPTY = 0
+			const LOADING = 1
+			const DONE = 2
+
+			def new
+			def abort
+
+			# async read methods
+			def readAsArrayBuffer(blob Blob)
+			def readAsText(blob Blob)
+			def readAsText(blob Blob, label string)
+			def readAsDataURL(blob Blob)
+
+			# event handler attributes
+			var onloadstart fn()
+			var onprogress fn()
+			var onload fn()
+			var onabort fn()
+			var onerror fn()
+			var onloadend fn()
+
+			def resultAsArrayBuffer ArrayBuffer {
+				assert((self as dynamic).result is ArrayBuffer)
+				return (self as dynamic).result
+			}
+
+			def resultAsString string {
+				assert((self as dynamic).result is string)
+				return (self as dynamic).result
+			}
+		}
+
+		class HTMLWindow {
+			const innerWidth int
+			const innerHeight int
+			const devicePixelRatio double
+
+			def addEventListener(type string, listener fn()) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLEvent)) { HTML.on(self, type, listener) }
+			def removeEventListener(type string, listener fn()) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLEvent)) { HTML.off(self, type, listener) }
+		}
+
+		class HTMLDocument {
+			const head HTMLElement
+			const body HTMLElement
+			const hidden bool
+
+			var title string
+
+			def createElement(tag string) HTMLElement
+			def createElementImage HTMLImageElement { return dynamic.Image.new() }
+			def createElementCanvas HTMLCanvasElement { return createElement("canvas") as HTMLCanvasElement }
+			def getElementById(id string) HTMLElement
+			def querySelector(selector string) HTMLElement
+			def querySelectorAll(selectors string) List<HTMLElement> { return HTML.asList<HTMLElement>((self as dynamic).querySelectorAll(selectors)) }
+			def getElementsByClassName(className string) List<HTMLElement> { return HTML.asList<HTMLElement>((self as dynamic).getElementsByClassName(className)) }
+
+			def addEventListener(type string, listener fn()) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLEvent)) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLKeyboardEvent)) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLMouseEvent)) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLTouchEvent)) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLWheelEvent)) { HTML.on(self, type, listener) }
+
+			def removeEventListener(type string, listener fn()) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLEvent)) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLMouseEvent)) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLTouchEvent)) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLKeyboardEvent)) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLWheelEvent)) { HTML.off(self, type, listener) }
+		}
+
+		class HTMLEvent {
+			const bubbles bool
+			const cancelable bool
+			const cancelBubble bool
+			const currentTarget HTMLElement
+			const defaultPrevented bool
+			const eventPhase int
+			const srcElement HTMLElement
+			const target HTMLElement
+			const timeStamp double
+			const type string
+
+			def stopPropagation
+			def stopImmediatePropagation
+			def preventDefault { HTML.preventDefault(self) }
+		}
+
+		class HTMLDataTransfer {
+			const effectAllowed string
+			const dropEffect string
+			def types List<string> { return HTML.asList<string>((self as dynamic).types) }
+			def files List<HTMLFile> { return HTML.asList<HTMLFile>((self as dynamic).files) }
+			def clearData bool
+			def clearData(format string) bool
+			def setData(format string, data string) bool
+			def getData(format string) string
+		}
+
+		class HTMLMouseEvent : HTMLEvent {
+			const altKey bool
+			const button int
+			const buttons int
+			const clientX int
+			const clientY int
+			const ctrlKey bool
+			const fromElement HTMLElement
+			const layerX int
+			const layerY int
+			const metaKey bool
+			const offsetX int
+			const offsetY int
+			const pageX int
+			const pageY int
+			const relatedTarget HTMLElement
+			const screenX int
+			const screenY int
+			const shiftKey bool
+			const toElement HTMLElement
+			const which int
+			const x int
+			const y int
+			const dataTransfer HTMLDataTransfer
+		}
+
+		class HTMLTouch {
+			const identifier int
+			const screenX int
+			const screenY int
+			const clientX int
+			const clientY int
+			const pageX int
+			const pageY int
+		}
+
+		class HTMLTouchEvent : HTMLEvent {
+			def touches List<HTMLTouch> { return HTML.asList<HTMLTouch>((self as dynamic).touches) }
+			def targetTouches List<HTMLTouch> { return HTML.asList<HTMLTouch>((self as dynamic).targetTouches) }
+			def changedTouches List<HTMLTouch> { return HTML.asList<HTMLTouch>((self as dynamic).changedTouches) }
+		}
+
+		class HTMLKeyboardEvent : HTMLEvent {
+			const altKey bool
+			const char string
+			const charCode int
+			const ctrlKey bool
+			const key string
+			const keyCode int
+			const locale string
+			const location int
+			const metaKey bool
+			const repeat bool
+			const shiftKey bool
+			const which int
+		}
+
+		class HTMLWheelEvent : HTMLMouseEvent {
+			const deltaMode int
+			const deltaX double
+			const deltaY double
+			const deltaZ double
+		}
+
+		class HTMLElement {
+			def appendChild(node HTMLElement)
+			def insertBefore(node HTMLElement, child HTMLElement)
+			def replaceChild(node HTMLElement, child HTMLElement)
+			def removeChild(node HTMLElement)
+
+			def addEventListener(type string, listener fn()) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLEvent)) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLKeyboardEvent)) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLMouseEvent)) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLTouchEvent)) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLWheelEvent)) { HTML.on(self, type, listener) }
+
+			def removeEventListener(type string, listener fn()) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLEvent)) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLKeyboardEvent)) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLMouseEvent)) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLTouchEvent)) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLWheelEvent)) { HTML.off(self, type, listener) }
+
+			def focus
+			def blur
+			def click
+
+			const firstChild HTMLElement
+			const lastChild HTMLElement
+			const nextSibling HTMLElement
+			const parentNode HTMLElement
+			const previousSibling HTMLElement
+			const offsetParent HTMLElement
+
+			var textContent string
+			var innerHTML string
+			var className string
+
+			const nodeType int
+			const nodeName string
+			const style CSSStyleDeclaration
+			const offsetLeft int
+			const offsetTop int
+		}
+
+		class HTMLImageElement : HTMLElement {
+			var src string
+			var onload fn()
+			var onerror fn()
+			const width int
+			const height int
+			const naturalWidth int
+			const naturalHeight int
+		}
+
+		class HTMLVideoElement : HTMLElement {
+			var src string
+			const width int
+			const height int
+			const videoWidth int
+			const videoHeight int
+		}
+
+		class HTMLCanvasElement : HTMLElement {
+			var width int
+			var height int
+			def toDataURL string
+		}
+
+		class CSSStyleDeclaration {
+			var alignmentBaseline string
+			var background string
+			var backgroundAttachment string
+			var backgroundClip string
+			var backgroundColor string
+			var backgroundImage string
+			var backgroundOrigin string
+			var backgroundPosition string
+			var backgroundRepeat string
+			var backgroundSize string
+			var baselineShift string
+			var border string
+			var borderBottom string
+			var borderBottomColor string
+			var borderBottomLeftRadius string
+			var borderBottomRightRadius string
+			var borderBottomStyle string
+			var borderBottomWidth string
+			var borderCollapse string
+			var borderColor string
+			var borderLeft string
+			var borderLeftColor string
+			var borderLeftStyle string
+			var borderLeftWidth string
+			var borderRadius string
+			var borderRight string
+			var borderRightColor string
+			var borderRightStyle string
+			var borderRightWidth string
+			var borderSpacing string
+			var borderStyle string
+			var borderTop string
+			var borderTopColor string
+			var borderTopLeftRadius string
+			var borderTopRightRadius string
+			var borderTopStyle string
+			var borderTopWidth string
+			var borderWidth string
+			var bottom string
+			var boxShadow string
+			var boxSizing string
+			var captionSide string
+			var clear string
+			var clip string
+			var clipPath string
+			var clipRule string
+			var color string
+			var content string
+			var counterIncrement string
+			var counterReset string
+			var cssFloat string
+			var cssText string
+			var cursor string
+			var direction string
+			var display string
+			var dominantBaseline string
+			var emptyCells string
+			var fill string
+			var fillOpacity string
+			var fillRule string
+			var font string
+			var fontFamily string
+			var fontSize string
+			var fontSizeAdjust string
+			var fontStretch string
+			var fontStyle string
+			var fontVariant string
+			var fontWeight string
+			var glyphOrientationHorizontal string
+			var glyphOrientationVertical string
+			var height string
+			var kerning string
+			var left string
+			var letterSpacing string
+			var lineHeight string
+			var listStyle string
+			var listStyleImage string
+			var listStylePosition string
+			var listStyleType string
+			var margin string
+			var marginBottom string
+			var marginLeft string
+			var marginRight string
+			var marginTop string
+			var marker string
+			var markerEnd string
+			var markerMid string
+			var markerStart string
+			var mask string
+			var maxHeight string
+			var maxWidth string
+			var minHeight string
+			var minWidth string
+			var msTransform string
+			var msTransformOrigin string
+			var opacity string
+			var orphans string
+			var outline string
+			var outlineColor string
+			var outlineStyle string
+			var outlineWidth string
+			var overflow string
+			var overflowX string
+			var overflowY string
+			var padding string
+			var paddingBottom string
+			var paddingLeft string
+			var paddingRight string
+			var paddingTop string
+			var pageBreakAfter string
+			var pageBreakBefore string
+			var pageBreakInside string
+			var pointerEvents string
+			var position string
+			var quotes string
+			var right string
+			var rubyAlign string
+			var rubyOverhang string
+			var rubyPosition string
+			var stopColor string
+			var stopOpacity string
+			var stroke string
+			var strokeDasharray string
+			var strokeDashoffset string
+			var strokeLinecap string
+			var strokeLinejoin string
+			var strokeMiterlimit string
+			var strokeOpacity string
+			var strokeWidth string
+			var tableLayout string
+			var textAlign string
+			var textAlignLast string
+			var textAnchor string
+			var textDecoration string
+			var textIndent string
+			var textJustify string
+			var textOverflow string
+			var textTransform string
+			var textUnderlinePosition string
+			var top string
+			var unicodeBidi string
+			var verticalAlign string
+			var visibility string
+			var whiteSpace string
+			var widows string
+			var width string
+			var wordBreak string
+			var wordSpacing string
+			var wordWrap string
+			var zIndex string
+		}
+
+		namespace performance {
+			def now double {
+				var perf = (window as dynamic).performance
+				return perf && perf.now ? perf.now() : +dynamic.Date.new()
+			}
+		}
+
+		namespace navigator {
+			const platform string
+			const userAgent string
+		}
+
+		namespace console {
+			const log dynamic
+			const info dynamic
+			const warn dynamic
+			const error dynamic
+		}
+	}
+
+	class HTMLElement {
+		const ELEMENT_NODE = 1
+		const ATTRIBUTE_NODE = 2 # historical
+		const TEXT_NODE = 3
+		const CDATA_SECTION_NODE = 4 # historical
+		const ENTITY_REFERENCE_NODE = 5 # historical
+		const ENTITY_NODE = 6 # historical
+		const PROCESSING_INSTRUCTION_NODE = 7
+		const COMMENT_NODE = 8
+		const DOCUMENT_NODE = 9
+		const DOCUMENT_TYPE_NODE = 10
+		const DOCUMENT_FRAGMENT_NODE = 11
+		const NOTATION_NODE = 12 # historical
+	}
+
+	class HTMLEvent {
+		const CAPTURING_PHASE = 1
+		const AT_TARGET = 2
+		const BUBBLING_PHASE = 3
+	}
+
+	class HTMLKeyboardEvent {
+		const DOM_KEY_LOCATION_STANDARD = 0
+		const DOM_KEY_LOCATION_LEFT = 1
+		const DOM_KEY_LOCATION_RIGHT = 2
+		const DOM_KEY_LOCATION_NUMPAD = 3
+	}
+
+	class HTMLWheelEvent {
+		const DOM_DELTA_PIXEL = 0
+		const DOM_DELTA_LINE = 1
+		const DOM_DELTA_PAGE = 2
+	}
+
+	namespace HTML {
+		def asList<T>(listLike dynamic) List<T> {
+			var list List<T> = []
+			for i in 0..listLike.length {
+				list.append(listLike[i])
+			}
+			return list
+		}
+
+		# Wrap these calls in a level of indirection to reduce generated code size
+		@neverinline {
+			def on(target dynamic, type string, listener dynamic) {
+				target.addEventListener(type, listener)
+			}
+
+			def off(target dynamic, type string, listener dynamic) {
+				target.removeEventListener(type, listener)
+			}
+
+			def preventDefault(event dynamic) {
+				event.preventDefault()
+			}
+		}
+	}
+}

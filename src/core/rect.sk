@@ -1,0 +1,58 @@
+class Rect {
+	var x double
+	var y double
+	var width double
+	var height double
+
+	def new {
+	}
+
+	def new(x double, y double, width double, height double) {
+		self.x = x
+		self.y = y
+		self.width = width
+		self.height = height
+	}
+
+	def left double {
+		return x
+	}
+
+	def top double {
+		return y
+	}
+
+	def right double {
+		return x + width
+	}
+
+	def bottom double {
+		return y + height
+	}
+
+	def equals(r Rect) bool {
+		return x == r.x && y == r.y && width == r.width && height == r.height
+	}
+
+	def set(r Rect) {
+		x = r.x
+		y = r.y
+		width = r.width
+		height = r.height
+	}
+
+	def set(x double, y double, width double, height double) {
+		self.x = x
+		self.y = y
+		self.width = width
+		self.height = height
+	}
+
+	def clone Rect {
+		return new(x, y, width, height)
+	}
+
+	def toString string {
+		return "Rect(\(x), \(y), \(width), \(height))"
+	}
+}

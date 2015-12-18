@@ -1,0 +1,5 @@
+.DS_Store
+/node_modules/
+/src/core/shaders.sk
+/www/compiled.js
+/www/compiled.js.map

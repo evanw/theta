@@ -1,0 +1,150 @@
+namespace GPU {
+	class BufferPool {
+		const _context Context
+		const _chunks List<BufferChunk> = []
+
+		def allocate(format VertexFormat, bytes Uint8Array) BufferArea {
+			if bytes == null {
+				return null
+			}
+
+			assert(bytes.length > 0)
+			assert(bytes.length <= BufferChunk.BYTE_COUNT) # Larger chunks have to be split by the caller
+			assert(bytes.length % format.stride == 0)
+
+			# Try to use an existing chunk
+			var stride = format.stride
+			for chunk in _chunks {
+				var area = chunk.tryToAllocate(stride, bytes)
+				if area != null {
+					return area
+				}
+			}
+
+			# Otherwise, make a new chunk
+			var chunk = BufferChunk.new(self, _context.createVertexBuffer(BufferChunk.BYTE_COUNT))
+			_chunks.append(chunk)
+			return chunk.tryToAllocate(stride, bytes)
+		}
+	}
+
+	class BufferChunk {
+		const pool BufferPool
+		const buffer VertexBuffer
+		const areas List<BufferArea> = []
+		var bytesUsed = 0
+
+		def tryToAllocate(stride int, bytes Uint8Array) BufferArea {
+			var byteCount = bytes.length
+			var areas = self.areas
+			var area BufferArea = null
+
+			# Check if allocation is even possible
+			if bytesUsed + byteCount <= BYTE_COUNT {
+				# Clean up trailing freed areas
+				while !areas.isEmpty && areas.last.wasFreed {
+					areas.removeLast
+				}
+
+				# Try to append first
+				if !areas.isEmpty {
+					var last = areas.last
+					var byteOffset = _alignToNextMultiple(last.byteOffset + last.byteCount, stride)
+					if byteOffset + byteCount <= BYTE_COUNT {
+						area = BufferArea.new(self, byteCount, stride, byteOffset)
+					}
+				}
+
+				# Otherwise, collect garbage to make room
+				if area == null {
+					var byteOffset = 0
+					areas.removeIf(area => {
+						if area.wasFreed {
+							return true
+						}
+
+						# Fit each area as tightly as possible against the previous one
+						byteOffset = _alignToNextMultiple(byteOffset, stride)
+						if area.byteOffset != byteOffset {
+							buffer.move(area.byteOffset, byteOffset, area.byteCount)
+							area.wasMovedTo(byteOffset)
+							byteOffset += area.byteCount
+						}
+
+						return false
+					})
+
+					# Try to append again now that there is likely more room
+					byteOffset = _alignToNextMultiple(byteOffset, stride)
+					if byteOffset + byteCount <= BYTE_COUNT {
+						area = BufferArea.new(self, byteCount, stride, byteOffset)
+					}
+				}
+
+				# Finish the allocation
+				if area != null {
+					buffer.upload(bytes, area.byteOffset)
+					bytesUsed += byteCount
+					areas.append(area)
+				}
+			}
+
+			assert(0 <= bytesUsed && bytesUsed <= BYTE_COUNT)
+			return area
+		}
+	}
+
+	namespace BufferChunk {
+		const BYTE_COUNT = 4 * 1024 * 1024
+
+		def _alignToNextMultiple(value int, multiple int) int {
+			return value + (multiple - value % multiple) % multiple
+		}
+	}
+
+	class BufferArea {
+		const _chunk BufferChunk
+		const _byteCount int
+		const _stride int
+		var _byteOffset int
+		var _wasFreed = false
+
+		def byteCount int {
+			return _byteCount
+		}
+
+		def stride int {
+			return _stride
+		}
+
+		def byteOffset int {
+			return _byteOffset
+		}
+
+		def wasFreed bool {
+			return _wasFreed
+		}
+
+		def buffer VertexBuffer {
+			return _chunk.buffer
+		}
+
+		def free {
+			if !_wasFreed {
+				_wasFreed = true
+				_chunk.bytesUsed -= byteCount
+				assert(_chunk.bytesUsed >= 0)
+			}
+		}
+
+		def wasMovedTo(byteOffset int) {
+			assert(!_wasFreed)
+			_byteOffset = byteOffset
+		}
+
+		def update(bytes Uint8Array) {
+			assert(bytes.length == byteCount)
+			_chunk.buffer.upload(bytes, byteOffset)
+		}
+	}
+}

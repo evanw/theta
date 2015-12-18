@@ -1,0 +1,102 @@
+class Canvas {
+	var _format = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
+	var _context GPU.Context
+	var _pool GPU.BufferPool
+	var _smooth GPU.SmoothRenderer
+	var _material GPU.Material
+	var _quad GPU.BufferArea
+
+	# Viewport size
+	var _width = 0
+	var _height = 0
+	var _density = 1.0
+
+	# Event handlers
+	var onScroll fn(double, double) = null
+	var onPinch fn(double, double, double) = null
+	var onResize fn() = null
+
+	def new {
+		_context = GPU.HTMLContext.new
+		_pool = GPU.BufferPool.new(_context)
+		_smooth = GPU.SmoothRenderer.new(_context, _pool)
+		(_context as GPU.HTMLContext).gl.getExtension("OES_standard_derivatives")
+		_material = _context.createMaterial(_format, GLSLX_SOURCE_DEMO_VERTEX, GLSLX_SOURCE_DEMO_FRAGMENT)
+		_attachToDOM(_context as GPU.HTMLContext)
+		_quad = _pool.allocate(_format, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
+	}
+
+	def _attachToDOM(context GPU.HTMLContext) {
+		var isOSX = navigator.platform == "MacIntel" || navigator.platform == "MacPPC"
+		var canvas = context.gl.canvas
+
+		var resize = => {
+			_width = window.innerWidth
+			_height = window.innerHeight
+			_density = window.devicePixelRatio
+
+			var width = Math.round(_width * _density) as int
+			var height = Math.round(_height * _density) as int
+
+			context.resize(width, height)
+
+			var transform = Transform.new
+			transform.translate(-1, 1)
+			transform.scale(2.0 / width, -2.0 / height)
+			_smooth.setTransformAndPixelScale(transform, _density)
+
+			if onResize != null {
+				onResize()
+			}
+		}
+
+		canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
+			var swap = !isOSX && e.shiftKey
+			if e.ctrlKey || isOSX && e.metaKey {
+				if onPinch != null {
+					onPinch(e.pageX, e.pageY, e.deltaY)
+				}
+			} else {
+				if onScroll != null {
+					onScroll(
+						swap ? e.deltaY : e.deltaX,
+						swap ? e.deltaX : e.deltaY)
+				}
+			}
+			e.preventDefault
+		})
+
+		window.addEventListener("resize", resize)
+		document.body.appendChild(canvas)
+		resize()
+	}
+
+	def clear {
+		_context.clear(.ALL, .WHITE)
+	}
+
+	def drawGrid(origin Vector, scale double) {
+		var left = Math.ceil(-origin.x / scale) as int
+		var top = Math.ceil(-origin.y / scale) as int
+		var right = Math.ceil((_width - origin.x) / scale) as int
+		var bottom = Math.ceil((_height - origin.y) / scale) as int
+
+		for x in left..right {
+			var tx = origin.x + x * scale
+			_smooth.strokeLine(tx, 0, tx, _height, x == 0 ? .BLACK : Color.new(0, 0, 0, 31), 1)
+		}
+
+		for y in top..bottom {
+			var ty = origin.y + y * scale
+			_smooth.strokeLine(0, ty, _width, ty, y == 0 ? .BLACK : Color.new(0, 0, 0, 31), 1)
+		}
+
+		_smooth.flush
+	}
+
+	def drawFunction(origin Vector, scale double) {
+		_material.setUniformVec4(GLSLX_NAME_VALUE4, origin.x, origin.y, scale, _height)
+		_context.setPremultipliedBlendState
+		_context.draw(.TRIANGLE_STRIP, _material, _quad)
+	}
+}

@@ -1,0 +1,141 @@
+class DataArray {
+	var _bytes = Uint8Array.new(INITIAL_CAPACITY)
+	var _count = 0
+	var _readOffset = 0
+	var _capacity = INITIAL_CAPACITY
+
+	def clear {
+		_count = 0
+		_readOffset = 0
+	}
+
+	def isEmpty bool {
+		return _count == 0
+	}
+
+	def byteCount int {
+		return _count
+	}
+
+	def readOffset int {
+		return _readOffset
+	}
+
+	def bytes Uint8Array {
+		return _bytes.subarray(0, _count)
+	}
+
+	def _grow {
+		_capacity *= 2
+		var bytes = Uint8Array.new(_capacity)
+		if _bytes != null {
+			bytes.set(_bytes)
+		}
+		_bytes = bytes
+	}
+
+	def hasMoreToRead bool {
+		return _readOffset < _count
+	}
+
+	def skipBytes(count int) {
+		_readOffset += count
+	}
+
+	def appendBytes(bytes Uint8Array) DataArray {
+		var count = bytes.length
+		if _count + count > _capacity {
+			_grow
+		}
+
+		_bytes.set(bytes, _count)
+		_count += count
+		return self
+	}
+}
+
+namespace DataArray {
+	const INITIAL_CAPACITY = 256
+}
+
+################################################################################
+# Byte
+
+class DataArray {
+	def byteAt(index int) int {
+		assert(index >= 0 && index < _count)
+		return _bytes[index]
+	}
+
+	def appendByte(value int) DataArray {
+		if _count + 1 > _capacity {
+			_grow
+		}
+
+		_bytes[_count] = value
+		_count++
+		return self
+	}
+
+	def readByte int {
+		var value = byteAt(_readOffset)
+		_readOffset++
+		return value
+	}
+}
+
+################################################################################
+# Int
+
+class DataArray {
+	def intAt(index int) int {
+		assert(index >= 0 && index + 4 <= _count)
+		return Converter.bytesToInt(_bytes[index], _bytes[index + 1], _bytes[index + 2], _bytes[index + 3])
+	}
+
+	def appendInt(value int) DataArray {
+		appendBytes(Converter.intToBytes(value))
+		return self
+	}
+
+	def appendInts(values List<int>) DataArray {
+		for value in values {
+			appendInt(value)
+		}
+		return self
+	}
+
+	def readInt int {
+		var value = intAt(_readOffset)
+		_readOffset += 4
+		return value
+	}
+}
+
+################################################################################
+# Float
+
+class DataArray {
+	def floatAt(index int) double {
+		assert(index >= 0 && index + 4 <= _count)
+		return Converter.bytesToFloat(_bytes[index], _bytes[index + 1], _bytes[index + 2], _bytes[index + 3])
+	}
+
+	def appendFloat(value double) DataArray {
+		appendBytes(Converter.floatToBytes(value))
+		return self
+	}
+
+	def appendFloats(values List<double>) DataArray {
+		for value in values {
+			appendFloat(value)
+		}
+		return self
+	}
+
+	def readFloat double {
+		var value = floatAt(_readOffset)
+		_readOffset += 4
+		return value
+	}
+}

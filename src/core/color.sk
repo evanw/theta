@@ -1,0 +1,55 @@
+type Color : int {
+	def red int { return (self as int) & 255 }
+	def green int { return ((self as int) >> 8) & 255 }
+	def blue int { return ((self as int) >> 16) & 255 }
+	def alpha int { return (self as int) >>> 24 }
+
+	def redF double { return red / 255.0 }
+	def greenF double { return green / 255.0 }
+	def blueF double { return blue / 255.0 }
+	def alphaF double { return alpha / 255.0 }
+
+	def premultiplied Color {
+		var a = alphaF
+		return new(redF * a, greenF * a, blueF * a, a)
+	}
+
+	def unpremultiplied Color {
+		var a = alphaF
+		return new(redF / a, greenF / a, blueF / a, a)
+	}
+
+	def toString string {
+		return "Color(\(red), \(green), \(blue), \(alpha))"
+	}
+}
+
+namespace Color {
+	const TRANSPARENT = new(0, 0, 0, 0)
+	const BLACK = new(0, 0, 0)
+	const WHITE = new(255, 255, 255)
+
+	const RED = new(255, 0, 0)
+	const GREEN = new(0, 255, 0)
+	const BLUE = new(0, 0, 255)
+
+	const YELLOW = new(255, 255, 0)
+	const CYAN = new(0, 255, 255)
+	const MAGENTA = new(255, 0, 255)
+
+	def new(r int, g int, b int) Color {
+		return new(r, g, b, 255)
+	}
+
+	def new(r int, g int, b int, a int) Color {
+		return (r | g << 8 | b << 16 | a << 24) as Color
+	}
+
+	def new(r double, g double, b double, a double) Color {
+		return new(_clamp(r), _clamp(g), _clamp(b), _clamp(a))
+	}
+
+	def _clamp(v double) int {
+		return v < 0 ? 0 : v >= 1 ? 255 : (v * 256) as int
+	}
+}

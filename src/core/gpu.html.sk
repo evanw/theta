@@ -1,0 +1,1011 @@
+if TARGET == .JAVASCRIPT {
+	namespace GPU {
+		class HTMLContext :: Context {
+			var _attributeCount = 0
+			var _blendConstant double = 0.0
+			var _blendOperationMap IntMap<GLenum> = null
+			var _blendOperations = 0
+			var _comparisonMap IntMap<GLenum> = null
+			var _contextResetHandlers List<fn()> = []
+			var _currentClearColor = Color.TRANSPARENT
+			var _currentStencilState = StencilState.NONE
+			var _currentTextureSet HTMLTextureSet = null
+			var _defaultViewport = Rect.new
+			var _forceStateUpdate = true
+			var _generation = 1
+			var _gl WebGLRenderingContext = null
+			var _height = 0
+			var _oldBlendConstant double = 0.0
+			var _oldBlendOperations = 0
+			var _oldStencilState = StencilState.NONE
+			var _oldTextureSet HTMLTextureSet = null
+			var _oldViewport = Rect.new
+			var _operationMap IntMap<GLenum> = null
+			var _width = 0
+
+			def width int {
+				return _width
+			}
+
+			def height int {
+				return _height
+			}
+
+			def new {
+				_gl = document.createElementCanvas.getContextWebGL({
+					"alpha": false,
+					"antialias": false,
+					"depth": false,
+					"preserveDrawingBuffer": false,
+					"stencil": false,
+				})
+
+				if _gl == null {
+					throw Error.new("Could not initialize WebGL")
+				}
+
+				var canvas = _gl.canvas
+				var style = canvas.style
+				canvas.width = 0
+				canvas.height = 0
+				style.position = "absolute"
+				style.display = "block"
+				style.left = "0"
+				style.top = "0"
+				style.width = "100%"
+				style.height = "100%"
+
+				canvas.addEventListener("webglcontextlost", (e HTMLEvent) => {
+					e.preventDefault
+				})
+
+				canvas.addEventListener("webglcontextrestored", => {
+					_attributeCount = 0
+					_currentClearColor = .TRANSPARENT
+					_forceStateUpdate = true
+					_generation++
+					for handler in _contextResetHandlers {
+						handler()
+					}
+				})
+
+				# Using maps makes these compact in release
+				_blendOperationMap = {
+					BlendOperation.ZERO: _gl.ZERO,
+					BlendOperation.ONE: _gl.ONE,
+
+					BlendOperation.SOURCE_COLOR: _gl.SRC_COLOR,
+					BlendOperation.TARGET_COLOR: _gl.DST_COLOR,
+					BlendOperation.INVERSE_SOURCE_COLOR: _gl.ONE_MINUS_SRC_COLOR,
+					BlendOperation.INVERSE_TARGET_COLOR: _gl.ONE_MINUS_DST_COLOR,
+
+					BlendOperation.SOURCE_ALPHA: _gl.SRC_ALPHA,
+					BlendOperation.TARGET_ALPHA: _gl.DST_ALPHA,
+					BlendOperation.INVERSE_SOURCE_ALPHA: _gl.ONE_MINUS_SRC_ALPHA,
+					BlendOperation.INVERSE_TARGET_ALPHA: _gl.ONE_MINUS_DST_ALPHA,
+
+					BlendOperation.CONSTANT: _gl.CONSTANT_COLOR,
+					BlendOperation.INVERSE_CONSTANT: _gl.ONE_MINUS_CONSTANT_COLOR,
+				}
+				_comparisonMap = {
+					Comparison.ALWAYS: _gl.ALWAYS,
+					Comparison.EQUAL: _gl.EQUAL,
+					Comparison.GREATER_THAN: _gl.GREATER,
+					Comparison.GREATER_THAN_OR_EQUAL: _gl.GEQUAL,
+					Comparison.LESS_THAN: _gl.LESS,
+					Comparison.LESS_THAN_OR_EQUAL: _gl.LEQUAL,
+					Comparison.NEVER: _gl.NEVER,
+					Comparison.NOT_EQUAL: _gl.NOTEQUAL,
+				}
+				_operationMap = {
+					StencilOperation.DECREMENT_CLAMP: _gl.DECR,
+					StencilOperation.DECREMENT_WRAP: _gl.DECR_WRAP,
+					StencilOperation.INCREMENT_CLAMP: _gl.INCR,
+					StencilOperation.INCREMENT_WRAP: _gl.INCR_WRAP,
+					StencilOperation.INVERT: _gl.INVERT,
+					StencilOperation.KEEP: _gl.KEEP,
+					StencilOperation.REPLACE: _gl.REPLACE,
+					StencilOperation.ZERO: _gl.ZERO,
+				}
+			}
+
+			def gl WebGLRenderingContext {
+				return _gl
+			}
+
+			def generation int {
+				return _generation
+			}
+
+			def addContextResetHandler(callback fn()) {
+				_contextResetHandlers.appendOne(callback)
+			}
+
+			def removeContextResetHandler(callback fn()) {
+				_contextResetHandlers.removeOne(callback)
+			}
+
+			def currentTextureSet TextureSet {
+				return _currentTextureSet
+			}
+
+			def beginFrame {
+				setTextureSet(null)
+			}
+
+			def endFrame {
+			}
+
+			def setBlendState(sourceColor BlendOperation, targetColor BlendOperation, sourceAlpha BlendOperation, targetAlpha BlendOperation, constant double) {
+				_blendOperations = _packBlendModes(sourceColor, targetColor, sourceAlpha, targetAlpha)
+				_blendConstant = constant
+			}
+
+			def setViewport(x int, y int, width int, height int) {
+				(_currentTextureSet != null ? _currentTextureSet.viewport : _defaultViewport).set(x, y, width, height)
+			}
+
+			def draw(primitive Primitive, material Material, area BufferArea) {
+				if area == null {
+					return
+				}
+
+				assert(area.stride == material.format.stride)
+
+				# Update the texture set before preparing the material so uniform samplers can check for that they use different textures
+				_updateTextureSetAndViewport
+				HTMLMaterial.from(material).prepare
+
+				# Update the vertex buffer before updating the format so attributes can bind correctly
+				HTMLVertexBuffer.from(area.buffer).prepare
+				_updateFormat(material.format)
+
+				# Draw now that everything is ready
+				_updateBlendState
+				_updateStencilState
+				_gl.drawArrays(primitive == .TRIANGLES ? _gl.TRIANGLES : _gl.TRIANGLE_STRIP, area.byteOffset / area.stride, area.byteCount / area.stride)
+
+				# Forced state updates are done once after a context loss
+				_forceStateUpdate = false
+			}
+
+			def resize(width int, height int) {
+				if _width != width || _height != height {
+					var canvas = _gl.canvas
+					canvas.width = width
+					canvas.height = height
+					setViewport(0, 0, width, height)
+					_width = width
+					_height = height
+				}
+			}
+
+			def clear(mode Clear, color Color) {
+				_updateTextureSetAndViewport
+				_updateStencilState
+				_updateBlendState
+
+				if color != _currentClearColor {
+					_gl.clearColor(color.redF, color.greenF, color.blueF, color.alphaF)
+					_currentClearColor = color
+				}
+
+				_gl.clear((mode != .DEPTH_STENCIL ? _gl.COLOR_BUFFER_BIT : 0) | (mode != .COLOR ? _gl.DEPTH_BUFFER_BIT | _gl.STENCIL_BUFFER_BIT : 0))
+			}
+
+			def setStencilState(state StencilState) {
+				assert(state != null)
+				_currentStencilState = state
+			}
+
+			def setTextureSet(textureSet TextureSet) {
+				_currentTextureSet = HTMLTextureSet.from(textureSet)
+			}
+
+			def createMaterial(format VertexFormat, vertexSource string, fragmentSource string) Material {
+				var material = HTMLMaterial.new(self, format, vertexSource, fragmentSource)
+
+				# Compiling shaders is really expensive so we want to get that started
+				# as early as possible. In Chrome and possibly other browsers, shader
+				# compilation can happen asynchronously as long as you don't call
+				# useProgram().
+				#
+				#   https://plus.google.com/+BrandonJonesToji/posts/4ERHkicC5Ny
+				#
+				material.program
+
+				return material
+			}
+
+			def createVertexBuffer(byteCount int) VertexBuffer {
+				assert(byteCount > 0 && byteCount % 4 == 0)
+				return HTMLVertexBuffer.new(self, byteCount)
+			}
+
+			def createTexture(format TextureFormat, width int, height int, pixels Uint8Array) Texture {
+				return HTMLTexture.new(self, format, width, height, pixels)
+			}
+
+			def createTextureSet(color Texture, stencil Texture) TextureSet {
+				return HTMLTextureSet.new(self, HTMLTexture.from(color), HTMLTexture.from(stencil))
+			}
+
+			def _updateTextureSetAndViewport {
+				var textureSet = _currentTextureSet
+				var viewport = textureSet != null ? textureSet.viewport : _defaultViewport
+				var gl = _gl
+
+				if _forceStateUpdate || _oldTextureSet != textureSet {
+					gl.bindFramebuffer(gl.FRAMEBUFFER, textureSet?.framebuffer)
+					_oldTextureSet = textureSet
+				}
+
+				if _forceStateUpdate || !_oldViewport.equals(viewport) {
+					gl.viewport(viewport.x as int, viewport.y as int, viewport.width as int, viewport.height as int)
+					_oldViewport.set(viewport)
+				}
+			}
+
+			def _updateBlendState {
+				if _forceStateUpdate || _oldBlendOperations != _blendOperations || _oldBlendConstant != _blendConstant {
+					var gl = _gl
+					var operations = _blendOperations
+					var oldOperations = _oldBlendOperations
+					var sourceColor = (operations & 0xFF) as BlendOperation
+					var targetColor = ((operations >> 8) & 0xFF) as BlendOperation
+					var sourceAlpha = ((operations >> 16) & 0xFF) as BlendOperation
+					var targetAlpha = (operations >> 24) as BlendOperation
+					var constant = _blendConstant
+
+					assert(sourceColor in _blendOperationMap)
+					assert(targetColor in _blendOperationMap)
+					assert(sourceAlpha in _blendOperationMap)
+					assert(targetAlpha in _blendOperationMap)
+					assert(constant >= 0 && constant <= 1)
+
+					# Special-case the blend mode that doesn't modify anything
+					if operations == KEEP_BLEND_OPERATIONS {
+						gl.colorMask(false, false, false, false)
+					} else {
+						if _forceStateUpdate || oldOperations == KEEP_BLEND_OPERATIONS {
+							gl.colorMask(true, true, true, true)
+						}
+
+						# Special-case the blend mode that just writes over the target buffer
+						if operations == COPY_BLEND_OPERATIONS {
+							gl.disable(gl.BLEND)
+						} else {
+							if _forceStateUpdate || oldOperations == COPY_BLEND_OPERATIONS || oldOperations == KEEP_BLEND_OPERATIONS {
+								gl.enable(gl.BLEND)
+							}
+
+							# Otherwise, use actual blending
+							gl.blendFuncSeparate(_blendOperationMap[sourceColor], _blendOperationMap[targetColor], _blendOperationMap[sourceAlpha], _blendOperationMap[targetAlpha])
+							gl.blendColor(constant, constant, constant, constant)
+						}
+					}
+
+					_oldBlendConstant = _blendConstant
+					_oldBlendOperations = operations
+				}
+			}
+
+			def _updateStencilState {
+				var gl = _gl
+				var old = _oldStencilState
+				var new = _currentStencilState
+				var front = new.frontFace
+				var back = new.backFace
+				var first = front == back ? gl.FRONT_AND_BACK : gl.FRONT
+
+				if _forceStateUpdate || !old.equals(new) {
+					if _forceStateUpdate || old.isEnabled != new.isEnabled {
+						if new.isEnabled {
+							gl.enable(gl.STENCIL_TEST)
+						} else {
+							gl.disable(gl.STENCIL_TEST)
+						}
+					}
+
+					gl.stencilFuncSeparate(first, _comparisonMap[front.comparison], front.reference, front.readMask)
+					gl.stencilOpSeparate(first, _operationMap[front.stencilFail], _operationMap[front.stencilPassDepthFail], _operationMap[front.stencilPassDepthPass])
+					gl.stencilMaskSeparate(first, front.writeMask)
+
+					if front != back {
+						gl.stencilFuncSeparate(gl.BACK, _comparisonMap[back.comparison], back.reference, back.readMask)
+						gl.stencilOpSeparate(gl.BACK, _operationMap[back.stencilFail], _operationMap[back.stencilPassDepthFail], _operationMap[back.stencilPassDepthPass])
+						gl.stencilMaskSeparate(gl.BACK, back.writeMask)
+					}
+
+					_oldStencilState = new
+				}
+			}
+
+			def _updateFormat(format VertexFormat) {
+				# Update the attributes
+				var gl = _gl
+				var attributes = format.attributes
+				var count = attributes.count
+				for i in 0..count {
+					var attribute = attributes[i]
+					var isByte = attribute.type == .BYTE
+					gl.vertexAttribPointer(i, attribute.count, isByte ? gl.UNSIGNED_BYTE : gl.FLOAT, isByte, format.stride, attribute.byteOffset)
+				}
+
+				# Update the attribute count
+				while _attributeCount < count {
+					gl.enableVertexAttribArray(_attributeCount)
+					_attributeCount++
+				}
+				while _attributeCount > count {
+					_attributeCount--
+					gl.disableVertexAttribArray(_attributeCount)
+				}
+				_attributeCount = count
+			}
+		}
+
+		namespace HTMLContext {
+			const COPY_BLEND_OPERATIONS = _packBlendModes(.ONE, .ZERO, .ONE, .ZERO)
+			const KEEP_BLEND_OPERATIONS = _packBlendModes(.ZERO, .ONE, .ZERO, .ONE)
+
+			def from(context Context) HTMLContext {
+				assert(context == null || context is HTMLContext)
+				return context as HTMLContext
+			}
+
+			def _packBlendModes(sourceColor BlendOperation, targetColor BlendOperation, sourceAlpha BlendOperation, targetAlpha BlendOperation) int {
+				return sourceColor | targetColor << 8 | sourceAlpha << 16 | targetAlpha << 24
+			}
+		}
+
+		class HTMLUniform {
+			const _material HTMLMaterial
+			const _name string
+			var _generation = 0
+			var _location WebGLUniformLocation = null
+			var _isDirty = true
+
+			# Upload this uniform if it's dirty
+			def prepare
+
+			def location WebGLUniformLocation {
+				var context = HTMLContext.from(_material.context)
+				if _generation != context.generation {
+					_location = context.gl.getUniformLocation(_material.program, _name)
+					_generation = context.generation
+
+					# Validate the shader against this uniform
+					if !RELEASE {
+						var program = _material.program
+						var gl = context.gl
+						for i in 0..gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) {
+							var info = gl.getActiveUniform(program, i)
+							if info.name == _name {
+								assert(info.size == 1)
+								switch info.type {
+									case gl.FLOAT { assert(self is HTMLUniformFloat) }
+									case gl.FLOAT_MAT3 { assert(self is HTMLUniformMat3) }
+									case gl.FLOAT_VEC2 { assert(self is HTMLUniformVec2) }
+									case gl.FLOAT_VEC3 { assert(self is HTMLUniformVec3) }
+									case gl.FLOAT_VEC4 { assert(self is HTMLUniformVec4) }
+									case gl.INT { assert(self is HTMLUniformInt) }
+									case gl.SAMPLER_2D { assert(self is HTMLUniformSampler) }
+									default { assert(false) }
+								}
+							}
+						}
+					}
+				}
+				return _location
+			}
+		}
+
+		class HTMLUniformFloat : HTMLUniform {
+			var _x = 0.0
+
+			def set(x double) {
+				if x != _x {
+					_x = x
+					_isDirty = true
+				}
+			}
+
+			over prepare {
+				var context = HTMLContext.from(_material.context)
+				if _generation != context.generation || _isDirty {
+					context.gl.uniform1f(location, _x)
+					_isDirty = false
+				}
+			}
+		}
+
+		class HTMLUniformInt : HTMLUniform {
+			var _x = 0
+
+			def set(x int) {
+				if x != _x {
+					_x = x
+					_isDirty = true
+				}
+			}
+
+			over prepare {
+				var context = HTMLContext.from(_material.context)
+				if _generation != context.generation || _isDirty {
+					context.gl.uniform1i(location, _x)
+					_isDirty = false
+				}
+			}
+		}
+
+		class HTMLUniformVec2 : HTMLUniform {
+			var _x = 0.0
+			var _y = 0.0
+
+			def set(x double, y double) {
+				if x != _x || y != _y {
+					_x = x
+					_y = y
+					_isDirty = true
+				}
+			}
+
+			over prepare {
+				var context = HTMLContext.from(_material.context)
+				if _generation != context.generation || _isDirty {
+					context.gl.uniform2f(location, _x, _y)
+					_isDirty = false
+				}
+			}
+		}
+
+		class HTMLUniformVec3 : HTMLUniform {
+			var _x = 0.0
+			var _y = 0.0
+			var _z = 0.0
+
+			def set(x double, y double, z double) {
+				if x != _x || y != _y || z != _z {
+					_x = x
+					_y = y
+					_z = z
+					_isDirty = true
+				}
+			}
+
+			over prepare {
+				var context = HTMLContext.from(_material.context)
+				if _generation != context.generation || _isDirty {
+					context.gl.uniform3f(location, _x, _y, _z)
+					_isDirty = false
+				}
+			}
+		}
+
+		class HTMLUniformVec4 : HTMLUniform {
+			var _x = 0.0
+			var _y = 0.0
+			var _z = 0.0
+			var _w = 0.0
+
+			def set(x double, y double, z double, w double) {
+				if x != _x || y != _y || z != _z || w != _w {
+					_x = x
+					_y = y
+					_z = z
+					_w = w
+					_isDirty = true
+				}
+			}
+
+			over prepare {
+				var context = HTMLContext.from(_material.context)
+				if _generation != context.generation || _isDirty {
+					context.gl.uniform4f(location, _x, _y, _z, _w)
+					_isDirty = false
+				}
+			}
+		}
+
+		class HTMLUniformMat3 : HTMLUniform {
+			var _values = [
+				1.0, 0.0, 0.0,
+				0.0, 1.0, 0.0,
+				0.0, 0.0, 1.0,
+			]
+
+			def set(m00 double, m01 double, m02 double, m10 double, m11 double, m12 double, m20 double, m21 double, m22 double) {
+				# These values are deliberately transposed because WebGL requires the "transpose" argument of uniformMatrix() to be false
+				_cachedValues[0] = m00
+				_cachedValues[1] = m10
+				_cachedValues[2] = m20
+				_cachedValues[3] = m01
+				_cachedValues[4] = m11
+				_cachedValues[5] = m21
+				_cachedValues[6] = m02
+				_cachedValues[7] = m12
+				_cachedValues[8] = m22
+
+				for i in 0..9 {
+					if _cachedValues[i] != _values[i] {
+						var swap = _values
+						_values = _cachedValues
+						_cachedValues = swap
+						_isDirty = true
+						break
+					}
+				}
+			}
+
+			over prepare {
+				var context = HTMLContext.from(_material.context)
+				if _generation != context.generation || _isDirty {
+					context.gl.uniformMatrix3fv(location, false, _values)
+					_isDirty = false
+				}
+			}
+		}
+
+		namespace HTMLUniformMat3 {
+			# Statically allocate this to avoid allocations
+			var _cachedValues = [
+				1.0, 0.0, 0.0,
+				0.0, 1.0, 0.0,
+				0.0, 0.0, 1.0,
+			]
+		}
+
+		class HTMLUniformSampler : HTMLUniform {
+			var _texture HTMLTexture = null
+			var _index = -1
+
+			def set(texture Texture, index int) {
+				if _texture != texture || _index != index {
+					_texture = HTMLTexture.from(texture)
+					_index = index
+					_isDirty = true
+				}
+			}
+
+			over prepare {
+				var context = HTMLContext.from(_material.context)
+				var gl = context.gl
+				assert(_texture == null || context.currentTextureSet == null || _texture != context.currentTextureSet.colorTexture)
+				if _generation != context.generation || _isDirty {
+					gl.uniform1i(location, _index)
+					_isDirty = false
+				}
+				gl.activeTexture(gl.TEXTURE_N(_index))
+				gl.bindTexture(gl.TEXTURE_2D, _texture != null && _texture.width > 0 && _texture.height > 0 ? _texture.texture : null)
+			}
+		}
+
+		class HTMLMaterial :: Material {
+			const _context HTMLContext
+			const _format VertexFormat
+			const _vertexSource string
+			const _fragmentSource string
+			const _uniformsMap StringMap<HTMLUniform> = {}
+			const _uniformsList List<HTMLUniform> = []
+			var _generation = 0
+			var _program WebGLProgram = null
+
+			def context Context {
+				return _context
+			}
+
+			def format VertexFormat {
+				return _format
+			}
+
+			def vertexSource string {
+				return _vertexSource
+			}
+
+			def fragmentSource string {
+				return _fragmentSource
+			}
+
+			def setUniformFloat(name string, x double) {
+				var uniform = _uniformsMap.get(name, null)
+				if uniform == null {
+					uniform = HTMLUniformFloat.new(self, name)
+					_uniformsMap[name] = uniform
+					_uniformsList.append(uniform)
+				}
+				assert(uniform is HTMLUniformFloat)
+				(uniform as HTMLUniformFloat).set(x)
+			}
+
+			def setUniformInt(name string, x int) {
+				var uniform = _uniformsMap.get(name, null)
+				if uniform == null {
+					uniform = HTMLUniformInt.new(self, name)
+					_uniformsMap[name] = uniform
+					_uniformsList.append(uniform)
+				}
+				assert(uniform is HTMLUniformInt)
+				(uniform as HTMLUniformInt).set(x)
+			}
+
+			def setUniformVec2(name string, x double, y double) {
+				var uniform = _uniformsMap.get(name, null)
+				if uniform == null {
+					uniform = HTMLUniformVec2.new(self, name)
+					_uniformsMap[name] = uniform
+					_uniformsList.append(uniform)
+				}
+				assert(uniform is HTMLUniformVec2)
+				(uniform as HTMLUniformVec2).set(x, y)
+			}
+
+			def setUniformVec3(name string, x double, y double, z double) {
+				var uniform = _uniformsMap.get(name, null)
+				if uniform == null {
+					uniform = HTMLUniformVec3.new(self, name)
+					_uniformsMap[name] = uniform
+					_uniformsList.append(uniform)
+				}
+				assert(uniform is HTMLUniformVec3)
+				(uniform as HTMLUniformVec3).set(x, y, z)
+			}
+
+			def setUniformVec4(name string, x double, y double, z double, w double) {
+				var uniform = _uniformsMap.get(name, null)
+				if uniform == null {
+					uniform = HTMLUniformVec4.new(self, name)
+					_uniformsMap[name] = uniform
+					_uniformsList.append(uniform)
+				}
+				assert(uniform is HTMLUniformVec4)
+				(uniform as HTMLUniformVec4).set(x, y, z, w)
+			}
+
+			def setUniformMat3(name string, m00 double, m01 double, m02 double, m10 double, m11 double, m12 double, m20 double, m21 double, m22 double) {
+				var uniform = _uniformsMap.get(name, null)
+				if uniform == null {
+					uniform = HTMLUniformMat3.new(self, name)
+					_uniformsMap[name] = uniform
+					_uniformsList.append(uniform)
+				}
+				assert(uniform is HTMLUniformMat3)
+				(uniform as HTMLUniformMat3).set(m00, m01, m02, m10, m11, m12, m20, m21, m22)
+			}
+
+			def setUniformSampler(name string, texture Texture, index int) {
+				var uniform = _uniformsMap.get(name, null)
+				if uniform == null {
+					uniform = HTMLUniformSampler.new(self, name)
+					_uniformsMap[name] = uniform
+					_uniformsList.append(uniform)
+				}
+				assert(uniform is HTMLUniformSampler)
+				(uniform as HTMLUniformSampler).set(texture, index)
+			}
+
+			def program WebGLProgram {
+				var gl = _context.gl
+				if _generation != _context.generation {
+					_program = gl.createProgram
+					_compileShader(gl, gl.VERTEX_SHADER, vertexSource)
+					_compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource)
+					var attributes = format.attributes
+					for i in 0..attributes.count {
+						gl.bindAttribLocation(_program, i, attributes[i].name)
+					}
+					gl.linkProgram(_program)
+					if !gl.getProgramParameter(_program, gl.LINK_STATUS) {
+						throw Error.new(gl.getProgramInfoLog(_program))
+					}
+					_generation = _context.generation
+
+					# Validate this shader against the format
+					if !RELEASE {
+						for attribute in attributes {
+							for i in 0..gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES) {
+								var info = gl.getActiveAttrib(program, i)
+								if info.name == attribute.name {
+									assert(info.size == 1)
+									switch attribute.count {
+										case 1 { assert(info.type == gl.FLOAT) }
+										case 2 { assert(info.type == gl.FLOAT_VEC2) }
+										case 3 { assert(info.type == gl.FLOAT_VEC3) }
+										case 4 { assert(info.type == gl.FLOAT_VEC4) }
+										default { assert(false) }
+									}
+								}
+							}
+						}
+					}
+				}
+				return _program
+			}
+
+			def prepare {
+				_context.gl.useProgram(program)
+				for uniform in _uniformsList {
+					uniform.prepare
+				}
+			}
+
+			def _compileShader(gl WebGLRenderingContext, type GLenum, source string) {
+				var shader = gl.createShader(type)
+				gl.shaderSource(shader, source)
+				gl.compileShader(shader)
+				if !gl.getShaderParameter(shader, gl.COMPILE_STATUS) {
+					throw Error.new(gl.getShaderInfoLog(shader))
+				}
+				gl.attachShader(_program, shader)
+			}
+		}
+
+		namespace HTMLMaterial {
+			def from(material Material) HTMLMaterial {
+				assert(material == null || material is HTMLMaterial)
+				return material as HTMLMaterial
+			}
+		}
+
+		class HTMLVertexBuffer :: VertexBuffer {
+			const _context HTMLContext
+			var _generation = 0
+			var _buffer WebGLBuffer = null
+			var _bytes Uint8Array = null
+			var _isDirty = true
+			var _dirtyMin = INT_MAX
+			var _dirtyMax = 0
+			var _totalMin = INT_MAX
+			var _totalMax = 0
+			var _byteCount = 0
+
+			def new(context HTMLContext, byteCount int) {
+				_context = context
+				_byteCount = byteCount
+				_bytes = Uint8Array.new(byteCount)
+			}
+
+			def context Context {
+				return _context
+			}
+
+			def byteCount int {
+				return _byteCount
+			}
+
+			def move(sourceByteOffset int, targetByteOffset int, byteCount int) {
+				assert(byteCount >= 0)
+				assert(0 <= sourceByteOffset && sourceByteOffset + byteCount <= _byteCount)
+				assert(0 <= targetByteOffset && targetByteOffset + byteCount <= _byteCount)
+
+				if sourceByteOffset != targetByteOffset && byteCount != 0 {
+					_bytes.set(_bytes.subarray(sourceByteOffset, _byteCount), targetByteOffset)
+					_growDirtyRegion(Math.min(sourceByteOffset, targetByteOffset), Math.max(sourceByteOffset, targetByteOffset) + byteCount)
+				}
+			}
+
+			def upload(bytes Uint8Array, byteOffset int) {
+				assert(0 <= byteOffset && byteOffset + bytes.length <= _byteCount)
+				_bytes.set(bytes, byteOffset)
+				_growDirtyRegion(byteOffset, byteOffset + bytes.length)
+			}
+
+			def prepare {
+				var gl = _context.gl
+
+				if _generation != _context.generation {
+					_buffer = gl.createBuffer
+					_generation = _context.generation
+					_isDirty = true
+				}
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, _buffer)
+
+				if _isDirty {
+					gl.bufferData(gl.ARRAY_BUFFER, _byteCount, gl.DYNAMIC_DRAW)
+					_dirtyMin = _totalMin
+					_dirtyMax = _totalMax
+					_isDirty = false
+				}
+
+				if _dirtyMin < _dirtyMax {
+					gl.bufferSubData(gl.ARRAY_BUFFER, _dirtyMin, _bytes.subarray(_dirtyMin, _dirtyMax))
+					_dirtyMin = INT_MAX
+					_dirtyMax = 0
+				}
+			}
+
+			def _growDirtyRegion(min int, max int) {
+				_dirtyMin = Math.min(_dirtyMin, min)
+				_dirtyMax = Math.max(_dirtyMax, max)
+				_totalMin = Math.min(_totalMin, min)
+				_totalMax = Math.max(_totalMax, max)
+			}
+		}
+
+		namespace HTMLVertexBuffer {
+			const INT_MAX = 0x7FFFFFFF
+
+			def from(buffer VertexBuffer) HTMLVertexBuffer {
+				assert(buffer == null || buffer is HTMLVertexBuffer)
+				return buffer as HTMLVertexBuffer
+			}
+		}
+
+		class HTMLTexture :: Texture {
+			const _context HTMLContext
+			var _format TextureFormat
+			var _width int
+			var _height int
+			var _pixels Uint8Array
+			var _renderbuffer WebGLRenderbuffer = null
+			var _texture WebGLTexture = null
+			var _generation = 0
+			var _isFormatDirty = true
+			var _isContentDirty = true
+
+			def context Context {
+				return _context
+			}
+
+			def format TextureFormat {
+				return _format
+			}
+
+			def width int {
+				return _width
+			}
+
+			def height int {
+				return _height
+			}
+
+			def resize(width int, height int, pixels Uint8Array) {
+				_width = width
+				_height = height
+				_pixels = pixels
+				_isContentDirty = true
+			}
+
+			def setFormat(format TextureFormat) {
+				if _format != format {
+					_format = format
+					_isFormatDirty = true
+				}
+			}
+
+			def isRenderbuffer bool {
+				return _format.pixelFormat == .DEPTH_24_STENCIL_8
+			}
+
+			def texture WebGLTexture {
+				assert(!isRenderbuffer)
+
+				var gl = _context.gl
+
+				# Create
+				if _generation != _context.generation {
+					_texture = gl.createTexture
+					_generation = _context.generation
+					_isFormatDirty = true
+					_isContentDirty = true
+				}
+
+				# Format
+				if _isFormatDirty {
+					gl.bindTexture(gl.TEXTURE_2D, _texture)
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, format.magFilter == .NEAREST ? gl.NEAREST : gl.LINEAR)
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, format.minFilter == .NEAREST ? gl.NEAREST : gl.LINEAR)
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, format.wrap == .REPEAT ? gl.REPEAT : gl.CLAMP_TO_EDGE)
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, format.wrap == .REPEAT ? gl.REPEAT : gl.CLAMP_TO_EDGE)
+					_isFormatDirty = false
+				}
+
+				# Resize
+				if _isContentDirty {
+					gl.bindTexture(gl.TEXTURE_2D, _texture)
+					gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, _width, _height, 0, gl.RGBA, gl.UNSIGNED_BYTE, _pixels)
+					_isContentDirty = false
+				}
+
+				return _texture
+			}
+
+			def renderbuffer WebGLRenderbuffer {
+				assert(isRenderbuffer)
+
+				var gl = _context.gl
+
+				# Create
+				if _generation != _context.generation {
+					_renderbuffer = gl.createRenderbuffer
+					_generation = _context.generation
+					_isContentDirty = true
+				}
+
+				# Resize
+				if _isContentDirty {
+					gl.bindRenderbuffer(gl.RENDERBUFFER, _renderbuffer)
+					gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_STENCIL, _width, _height)
+					_isContentDirty = false
+				}
+
+				return _renderbuffer
+			}
+		}
+
+		namespace HTMLTexture {
+			def from(texture Texture) HTMLTexture {
+				assert(texture == null || texture is HTMLTexture)
+				return texture as HTMLTexture
+			}
+		}
+
+		class HTMLTextureSet :: TextureSet {
+			var _context HTMLContext
+			var _colorTexture HTMLTexture
+			var _depthStencilTexture HTMLTexture
+			var _framebuffer WebGLFramebuffer = null
+			var _generation = 0
+			var _isDirty = true
+			var viewport = Rect.new
+
+			def context Context {
+				return _context
+			}
+
+			def colorTexture Texture {
+				return _colorTexture
+			}
+
+			def depthStencilTexture Texture {
+				return _depthStencilTexture
+			}
+
+			def setColor(texture Texture) {
+				if _colorTexture != texture {
+					_colorTexture = HTMLTexture.from(texture)
+					_isDirty = true
+				}
+			}
+
+			def setDepthStencil(texture Texture) {
+				if _depthStencilTexture != texture {
+					_depthStencilTexture = HTMLTexture.from(texture)
+					_isDirty = true
+				}
+			}
+
+			def framebuffer WebGLFramebuffer {
+				var gl = _context.gl
+
+				# Create
+				if _generation != _context.generation {
+					_framebuffer = gl.createFramebuffer
+					_generation = _context.generation
+					_isDirty = true
+				}
+
+				# Update
+				if _isDirty {
+					gl.bindFramebuffer(gl.FRAMEBUFFER, _framebuffer)
+					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, _colorTexture.texture, 0)
+					if _depthStencilTexture != null {
+						gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, _depthStencilTexture.renderbuffer)
+					}
+					assert(gl.checkFramebufferStatus(gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE)
+					_isDirty = false
+				}
+
+				return _framebuffer
+			}
+		}
+
+		namespace HTMLTextureSet {
+			def from(textureSet TextureSet) HTMLTextureSet {
+				assert(textureSet == null || textureSet is HTMLTextureSet)
+				return textureSet as HTMLTextureSet
+			}
+		}
+	}
+}

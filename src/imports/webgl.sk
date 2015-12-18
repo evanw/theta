@@ -1,0 +1,691 @@
+if TARGET == .JAVASCRIPT {
+	class HTMLCanvasElement {
+		def getContextWebGL WebGLRenderingContext {
+			try { return (self as dynamic).getContext("webgl") }
+			try { return (self as dynamic).getContext("experimental-webgl") }
+			return null
+		}
+
+		def getContextWebGL(options dynamic) WebGLRenderingContext {
+			try { return (self as dynamic).getContext("webgl", options) }
+			try { return (self as dynamic).getContext("experimental-webgl", options) }
+			return null
+		}
+	}
+
+	type GLenum = int
+
+	@import {
+		class WebGLContextAttributes {
+			const alpha bool
+			const depth bool
+			const stencil bool
+			const antialias bool
+			const premultipliedAlpha bool
+			const preserveDrawingBuffer bool
+			const preferLowPowerToHighPerformance bool
+			const failIfMajorPerformanceCaveat bool
+		}
+
+		class WebGLBuffer {
+		}
+
+		class WebGLFramebuffer {
+		}
+
+		class WebGLProgram {
+		}
+
+		class WebGLRenderbuffer {
+		}
+
+		class WebGLShader {
+		}
+
+		class WebGLTexture {
+		}
+
+		class WebGLUniformLocation {
+		}
+
+		class WebGLActiveInfo {
+			const size int
+			const type GLenum
+			const name string
+		}
+
+		class WebGLShaderPrecisionFormat {
+			const rangeMin int
+			const rangeMax int
+			const precision int
+		}
+
+		class WebGLRenderingContext {
+			const canvas HTMLCanvasElement
+			const drawingBufferWidth int
+			const drawingBufferHeight int
+
+			def getContextAttributes WebGLContextAttributes
+			def isContextLost bool
+
+			def getSupportedExtensions List<string>
+			def getExtension(name string) dynamic
+
+			def activeTexture(texture GLenum)
+			def attachShader(program WebGLProgram, shader WebGLShader)
+			def bindAttribLocation(program WebGLProgram, index int, name string)
+			def bindBuffer(target GLenum, buffer WebGLBuffer)
+			def bindFramebuffer(target GLenum, framebuffer WebGLFramebuffer)
+			def bindRenderbuffer(target GLenum, renderbuffer WebGLRenderbuffer)
+			def bindTexture(target GLenum, texture WebGLTexture)
+			def blendColor(red double, green double, blue double, alpha double)
+			def blendEquation(mode GLenum)
+			def blendEquationSeparate(modeRGB GLenum, modeAlpha GLenum)
+			def blendFunc(sfactor GLenum, dfactor GLenum)
+			def blendFuncSeparate(srcRGB GLenum, dstRGB GLenum, srcAlpha GLenum, dstAlpha GLenum)
+
+			def bufferData(target GLenum, size int, usage GLenum)
+			def bufferData(target GLenum, data ArrayBuffer, usage GLenum)
+			def bufferData(target GLenum, data ArrayBufferView, usage GLenum)
+			def bufferSubData(target GLenum, offset int, data ArrayBuffer)
+			def bufferSubData(target GLenum, offset int, data ArrayBufferView)
+
+			def checkFramebufferStatus(target GLenum) GLenum
+			def clear(mask int)
+			def clearColor(red double, green double, blue double, alpha double)
+			def clearDepth(depth double)
+			def clearStencil(s int)
+			def colorMask(red bool, green bool, blue bool, alpha bool)
+			def compileShader(shader WebGLShader)
+
+			def compressedTexImage2D(target GLenum, level int, internalformat GLenum, width int, height int, border int, data ArrayBufferView)
+			def compressedTexSubImage2D(target GLenum, level int, xoffset int, yoffset int, width int, height int, format GLenum, data ArrayBufferView)
+
+			def copyTexImage2D(target GLenum, level int, internalformat GLenum, x int, y int, width int, height int, border int)
+			def copyTexSubImage2D(target GLenum, level int, xoffset int, yoffset int, x int, y int, width int, height int)
+
+			def createBuffer WebGLBuffer
+			def createFramebuffer WebGLFramebuffer
+			def createProgram WebGLProgram
+			def createRenderbuffer WebGLRenderbuffer
+			def createShader(type GLenum) WebGLShader
+			def createTexture WebGLTexture
+
+			def cullFace(mode GLenum)
+
+			def deleteBuffer(buffer WebGLBuffer)
+			def deleteFramebuffer(framebuffer WebGLFramebuffer)
+			def deleteProgram(program WebGLProgram)
+			def deleteRenderbuffer(renderbuffer WebGLRenderbuffer)
+			def deleteShader(shader WebGLShader)
+			def deleteTexture(texture WebGLTexture)
+
+			def depthFunc(func GLenum)
+			def depthMask(flag bool)
+			def depthRange(zNear double, zFar double)
+			def detachShader(program WebGLProgram, shader WebGLShader)
+			def disable(cap GLenum)
+			def disableVertexAttribArray(index int)
+			def drawArrays(mode GLenum, first int, count int)
+			def drawElements(mode GLenum, count int, type GLenum, offset int)
+
+			def enable(cap GLenum)
+			def enableVertexAttribArray(index int)
+			def finish
+			def flush
+			def framebufferRenderbuffer(target GLenum, attachment GLenum, renderbuffertarget GLenum, renderbuffer WebGLRenderbuffer)
+			def framebufferTexture2D(target GLenum, attachment GLenum, textarget GLenum, texture WebGLTexture, level int)
+			def frontFace(mode GLenum)
+
+			def generateMipmap(target GLenum)
+
+			def getActiveAttrib(program WebGLProgram, index int) WebGLActiveInfo
+			def getActiveUniform(program WebGLProgram, index int) WebGLActiveInfo
+			def getAttachedShaders(program WebGLProgram) List<WebGLShader>
+
+			def getAttribLocation(program WebGLProgram, name string) int
+
+			def getBufferParameter(target GLenum, pname GLenum) dynamic
+			def getParameter(pname GLenum) dynamic
+
+			def getError GLenum
+
+			def getFramebufferAttachmentParameter(target GLenum, attachment GLenum, pname GLenum) dynamic
+			def getProgramParameter(program WebGLProgram, pname GLenum) dynamic
+			def getProgramInfoLog(program WebGLProgram) string
+			def getRenderbufferParameter(target GLenum, pname GLenum) dynamic
+			def getShaderParameter(shader WebGLShader, pname GLenum) dynamic
+			def getShaderPrecisionFormat(shadertype GLenum, precisiontype GLenum) WebGLShaderPrecisionFormat
+			def getShaderInfoLog(shader WebGLShader) string
+
+			def getShaderSource(shader WebGLShader) string
+
+			def getTexParameter(target GLenum, pname GLenum) dynamic
+
+			def getUniform(program WebGLProgram, location WebGLUniformLocation) dynamic
+
+			def getUniformLocation(program WebGLProgram, name string) WebGLUniformLocation
+
+			def getVertexAttrib(index int, pname GLenum) dynamic
+
+			def getVertexAttribOffset(index int, pname GLenum) int
+
+			def hint(target GLenum, mode GLenum)
+			def isBuffer(buffer WebGLBuffer) bool
+			def isEnabled(cap GLenum) bool
+			def isFramebuffer(framebuffer WebGLFramebuffer) bool
+			def isProgram(program WebGLProgram) bool
+			def isRenderbuffer(renderbuffer WebGLRenderbuffer) bool
+			def isShader(shader WebGLShader) bool
+			def isTexture(texture WebGLTexture) bool
+			def lineWidth(width double)
+			def linkProgram(program WebGLProgram)
+			def pixelStorei(pname GLenum, param int)
+			def polygonOffset(factor double, units double)
+
+			def readPixels(x int, y int, width int, height int, format GLenum, type GLenum, pixels ArrayBufferView)
+
+			def renderbufferStorage(target GLenum, internalformat GLenum, width int, height int)
+			def sampleCoverage(value double, invert bool)
+			def scissor(x int, y int, width int, height int)
+
+			def shaderSource(shader WebGLShader, source string)
+
+			def stencilFunc(func GLenum, ref int, mask int)
+			def stencilFuncSeparate(face GLenum, func GLenum, ref int, mask int)
+			def stencilMask(mask int)
+			def stencilMaskSeparate(face GLenum, mask int)
+			def stencilOp(fail GLenum, zfail GLenum, zpass GLenum)
+			def stencilOpSeparate(face GLenum, fail GLenum, zfail GLenum, zpass GLenum)
+
+			def texImage2D(target GLenum, level int, internalformat GLenum, width int, height int, border int, format GLenum, type GLenum, pixels ArrayBufferView)
+			def texImage2D(target GLenum, level int, internalformat GLenum, format GLenum, type GLenum, source ImageData)
+			def texImage2D(target GLenum, level int, internalformat GLenum, format GLenum, type GLenum, source HTMLImageElement)
+			def texImage2D(target GLenum, level int, internalformat GLenum, format GLenum, type GLenum, source HTMLCanvasElement)
+			def texImage2D(target GLenum, level int, internalformat GLenum, format GLenum, type GLenum, source HTMLVideoElement)
+
+			def texParameterf(target GLenum, pname GLenum, param double)
+			def texParameteri(target GLenum, pname GLenum, param GLenum)
+
+			def texSubImage2D(target GLenum, level int, xoffset int, yoffset int, width int, height int, format GLenum, type GLenum, pixels ArrayBufferView)
+			def texSubImage2D(target GLenum, level int, xoffset int, yoffset int, format GLenum, type GLenum, source ImageData)
+			def texSubImage2D(target GLenum, level int, xoffset int, yoffset int, format GLenum, type GLenum, source HTMLImageElement)
+			def texSubImage2D(target GLenum, level int, xoffset int, yoffset int, format GLenum, type GLenum, source HTMLCanvasElement)
+			def texSubImage2D(target GLenum, level int, xoffset int, yoffset int, format GLenum, type GLenum, source HTMLVideoElement)
+
+			def uniform1f(location WebGLUniformLocation, x double)
+			def uniform1fv(location WebGLUniformLocation, v Float32Array)
+			def uniform1fv(location WebGLUniformLocation, v List<double>)
+			def uniform1i(location WebGLUniformLocation, x int)
+			def uniform1iv(location WebGLUniformLocation, v Int32Array)
+			def uniform1iv(location WebGLUniformLocation, v List<int>)
+			def uniform2f(location WebGLUniformLocation, x double, y double)
+			def uniform2fv(location WebGLUniformLocation, v Float32Array)
+			def uniform2fv(location WebGLUniformLocation, v List<double>)
+			def uniform2i(location WebGLUniformLocation, x int, y int)
+			def uniform2iv(location WebGLUniformLocation, v Int32Array)
+			def uniform2iv(location WebGLUniformLocation, v List<int>)
+			def uniform3f(location WebGLUniformLocation, x double, y double, z double)
+			def uniform3fv(location WebGLUniformLocation, v Float32Array)
+			def uniform3fv(location WebGLUniformLocation, v List<double>)
+			def uniform3i(location WebGLUniformLocation, x int, y int, z int)
+			def uniform3iv(location WebGLUniformLocation, v Int32Array)
+			def uniform3iv(location WebGLUniformLocation, v List<int>)
+			def uniform4f(location WebGLUniformLocation, x double, y double, z double, w double)
+			def uniform4fv(location WebGLUniformLocation, v Float32Array)
+			def uniform4fv(location WebGLUniformLocation, v List<double>)
+			def uniform4i(location WebGLUniformLocation, x int, y int, z int, w int)
+			def uniform4iv(location WebGLUniformLocation, v Int32Array)
+			def uniform4iv(location WebGLUniformLocation, v List<int>)
+
+			def uniformMatrix2fv(location WebGLUniformLocation, transpose bool, value Float32Array)
+			def uniformMatrix2fv(location WebGLUniformLocation, transpose bool, value List<double>)
+			def uniformMatrix3fv(location WebGLUniformLocation, transpose bool, value Float32Array)
+			def uniformMatrix3fv(location WebGLUniformLocation, transpose bool, value List<double>)
+			def uniformMatrix4fv(location WebGLUniformLocation, transpose bool, value Float32Array)
+			def uniformMatrix4fv(location WebGLUniformLocation, transpose bool, value List<double>)
+
+			def useProgram(program WebGLProgram)
+			def validateProgram(program WebGLProgram)
+
+			def vertexAttrib1f(index int, x double)
+			def vertexAttrib1fv(index int, values Float32Array)
+			def vertexAttrib1fv(index int, values List<double>)
+			def vertexAttrib2f(index int, x double, y double)
+			def vertexAttrib2fv(index int, values Float32Array)
+			def vertexAttrib2fv(index int, values List<double>)
+			def vertexAttrib3f(index int, x double, y double, z double)
+			def vertexAttrib3fv(index int, values Float32Array)
+			def vertexAttrib3fv(index int, values List<double>)
+			def vertexAttrib4f(index int, x double, y double, z double, w double)
+			def vertexAttrib4fv(index int, values Float32Array)
+			def vertexAttrib4fv(index int, values List<double>)
+			def vertexAttribPointer(index int, size int, type GLenum, normalized bool, stride int, offset int)
+
+			def viewport(x int, y int, width int, height int)
+
+			# ClearBufferMask
+			const DEPTH_BUFFER_BIT               = 0x0100
+			const STENCIL_BUFFER_BIT             = 0x0400
+			const COLOR_BUFFER_BIT               = 0x4000
+
+			# BeginMode
+			const POINTS                         = 0x0000 as GLenum
+			const LINES                          = 0x0001 as GLenum
+			const LINE_LOOP                      = 0x0002 as GLenum
+			const LINE_STRIP                     = 0x0003 as GLenum
+			const TRIANGLES                      = 0x0004 as GLenum
+			const TRIANGLE_STRIP                 = 0x0005 as GLenum
+			const TRIANGLE_FAN                   = 0x0006 as GLenum
+
+			# AlphaFunction (not supported in ES20)
+			# NEVER
+			# LESS
+			# EQUAL
+			# LEQUAL
+			# GREATER
+			# NOTEQUAL
+			# GEQUAL
+			# ALWAYS
+
+			# BlendingFactorDest
+			const ZERO                           = 0 as GLenum
+			const ONE                            = 1 as GLenum
+			const SRC_COLOR                      = 0x0300 as GLenum
+			const ONE_MINUS_SRC_COLOR            = 0x0301 as GLenum
+			const SRC_ALPHA                      = 0x0302 as GLenum
+			const ONE_MINUS_SRC_ALPHA            = 0x0303 as GLenum
+			const DST_ALPHA                      = 0x0304 as GLenum
+			const ONE_MINUS_DST_ALPHA            = 0x0305 as GLenum
+
+			# BlendingFactorSrc
+			# ZERO
+			# ONE
+			const DST_COLOR                      = 0x0306 as GLenum
+			const ONE_MINUS_DST_COLOR            = 0x0307 as GLenum
+			const SRC_ALPHA_SATURATE             = 0x0308 as GLenum
+			# SRC_ALPHA
+			# ONE_MINUS_SRC_ALPHA
+			# DST_ALPHA
+			# ONE_MINUS_DST_ALPHA
+
+			# BlendEquationSeparate
+			const FUNC_ADD                       = 0x8006 as GLenum
+			const BLEND_EQUATION                 = 0x8009 as GLenum
+			const BLEND_EQUATION_RGB             = 0x8009 as GLenum
+			const BLEND_EQUATION_ALPHA           = 0x883D as GLenum
+
+			# BlendSubtract
+			const FUNC_SUBTRACT                  = 0x800A as GLenum
+			const FUNC_REVERSE_SUBTRACT          = 0x800B as GLenum
+
+			# Separate Blend Functions
+			const BLEND_DST_RGB                  = 0x80C8 as GLenum
+			const BLEND_SRC_RGB                  = 0x80C9 as GLenum
+			const BLEND_DST_ALPHA                = 0x80CA as GLenum
+			const BLEND_SRC_ALPHA                = 0x80CB as GLenum
+			const CONSTANT_COLOR                 = 0x8001 as GLenum
+			const ONE_MINUS_CONSTANT_COLOR       = 0x8002 as GLenum
+			const CONSTANT_ALPHA                 = 0x8003 as GLenum
+			const ONE_MINUS_CONSTANT_ALPHA       = 0x8004 as GLenum
+			const BLEND_COLOR                    = 0x8005 as GLenum
+
+			# Buffer Objects
+			const ARRAY_BUFFER                   = 0x8892 as GLenum
+			const ELEMENT_ARRAY_BUFFER           = 0x8893 as GLenum
+			const ARRAY_BUFFER_BINDING           = 0x8894 as GLenum
+			const ELEMENT_ARRAY_BUFFER_BINDING   = 0x8895 as GLenum
+
+			const STREAM_DRAW                    = 0x88E0 as GLenum
+			const STATIC_DRAW                    = 0x88E4 as GLenum
+			const DYNAMIC_DRAW                   = 0x88E8 as GLenum
+
+			const BUFFER_SIZE                    = 0x8764 as GLenum
+			const BUFFER_USAGE                   = 0x8765 as GLenum
+
+			const CURRENT_VERTEX_ATTRIB          = 0x8626 as GLenum
+
+			# CullFaceMode
+			const FRONT                          = 0x0404 as GLenum
+			const BACK                           = 0x0405 as GLenum
+			const FRONT_AND_BACK                 = 0x0408 as GLenum
+
+			# DepthFunction
+			# NEVER
+			# LESS
+			# EQUAL
+			# LEQUAL
+			# GREATER
+			# NOTEQUAL
+			# GEQUAL
+			# ALWAYS
+
+			# EnableCap
+			# TEXTURE_2D
+			const CULL_FACE                      = 0x0B44 as GLenum
+			const BLEND                          = 0x0BE2 as GLenum
+			const DITHER                         = 0x0BD0 as GLenum
+			const STENCIL_TEST                   = 0x0B90 as GLenum
+			const DEPTH_TEST                     = 0x0B71 as GLenum
+			const SCISSOR_TEST                   = 0x0C11 as GLenum
+			const POLYGON_OFFSET_FILL            = 0x8037 as GLenum
+			const SAMPLE_ALPHA_TO_COVERAGE       = 0x809E as GLenum
+			const SAMPLE_COVERAGE                = 0x80A0 as GLenum
+
+			# ErrorCode
+			const NO_ERROR                       = 0
+			const INVALID_ENUM                   = 0x0500 as GLenum
+			const INVALID_VALUE                  = 0x0501 as GLenum
+			const INVALID_OPERATION              = 0x0502 as GLenum
+			const OUT_OF_MEMORY                  = 0x0505 as GLenum
+
+			# FrontFaceDirection
+			const CW                             = 0x0900 as GLenum
+			const CCW                            = 0x0901 as GLenum
+
+			# GetPName
+			const LINE_WIDTH                     = 0x0B21 as GLenum
+			const ALIASED_POINT_SIZE_RANGE       = 0x846D as GLenum
+			const ALIASED_LINE_WIDTH_RANGE       = 0x846E as GLenum
+			const CULL_FACE_MODE                 = 0x0B45 as GLenum
+			const FRONT_FACE                     = 0x0B46 as GLenum
+			const DEPTH_RANGE                    = 0x0B70 as GLenum
+			const DEPTH_WRITEMASK                = 0x0B72 as GLenum
+			const DEPTH_CLEAR_VALUE              = 0x0B73 as GLenum
+			const DEPTH_FUNC                     = 0x0B74 as GLenum
+			const STENCIL_CLEAR_VALUE            = 0x0B91 as GLenum
+			const STENCIL_FUNC                   = 0x0B92 as GLenum
+			const STENCIL_FAIL                   = 0x0B94 as GLenum
+			const STENCIL_PASS_DEPTH_FAIL        = 0x0B95 as GLenum
+			const STENCIL_PASS_DEPTH_PASS        = 0x0B96 as GLenum
+			const STENCIL_REF                    = 0x0B97 as GLenum
+			const STENCIL_VALUE_MASK             = 0x0B93 as GLenum
+			const STENCIL_WRITEMASK              = 0x0B98 as GLenum
+			const STENCIL_BACK_FUNC              = 0x8800 as GLenum
+			const STENCIL_BACK_FAIL              = 0x8801 as GLenum
+			const STENCIL_BACK_PASS_DEPTH_FAIL   = 0x8802 as GLenum
+			const STENCIL_BACK_PASS_DEPTH_PASS   = 0x8803 as GLenum
+			const STENCIL_BACK_REF               = 0x8CA3 as GLenum
+			const STENCIL_BACK_VALUE_MASK        = 0x8CA4 as GLenum
+			const STENCIL_BACK_WRITEMASK         = 0x8CA5 as GLenum
+			const VIEWPORT                       = 0x0BA2 as GLenum
+			const SCISSOR_BOX                    = 0x0C10 as GLenum
+			# SCISSOR_TEST
+			const COLOR_CLEAR_VALUE              = 0x0C22 as GLenum
+			const COLOR_WRITEMASK                = 0x0C23 as GLenum
+			const UNPACK_ALIGNMENT               = 0x0CF5 as GLenum
+			const PACK_ALIGNMENT                 = 0x0D05 as GLenum
+			const MAX_TEXTURE_SIZE               = 0x0D33 as GLenum
+			const MAX_VIEWPORT_DIMS              = 0x0D3A as GLenum
+			const SUBPIXEL_BITS                  = 0x0D50 as GLenum
+			const RED_BITS                       = 0x0D52 as GLenum
+			const GREEN_BITS                     = 0x0D53 as GLenum
+			const BLUE_BITS                      = 0x0D54 as GLenum
+			const ALPHA_BITS                     = 0x0D55 as GLenum
+			const DEPTH_BITS                     = 0x0D56 as GLenum
+			const STENCIL_BITS                   = 0x0D57 as GLenum
+			const POLYGON_OFFSET_UNITS           = 0x2A00 as GLenum
+			# POLYGON_OFFSET_FILL
+			const POLYGON_OFFSET_FACTOR          = 0x8038 as GLenum
+			const TEXTURE_BINDING_2D             = 0x8069 as GLenum
+			const SAMPLE_BUFFERS                 = 0x80A8 as GLenum
+			const SAMPLES                        = 0x80A9 as GLenum
+			const SAMPLE_COVERAGE_VALUE          = 0x80AA as GLenum
+			const SAMPLE_COVERAGE_INVERT         = 0x80AB as GLenum
+
+			# GetTextureParameter
+			# TEXTURE_MAG_FILTER
+			# TEXTURE_MIN_FILTER
+			# TEXTURE_WRAP_S
+			# TEXTURE_WRAP_T
+
+			const COMPRESSED_TEXTURE_FORMATS     = 0x86A3 as GLenum
+
+			# HintMode
+			const DONT_CARE                      = 0x1100 as GLenum
+			const FASTEST                        = 0x1101 as GLenum
+			const NICEST                         = 0x1102 as GLenum
+
+			# HintTarget
+			const GENERATE_MIPMAP_HINT            = 0x8192 as GLenum
+
+			# DataType
+			const BYTE                           = 0x1400 as GLenum
+			const UNSIGNED_BYTE                  = 0x1401 as GLenum
+			const SHORT                          = 0x1402 as GLenum
+			const UNSIGNED_SHORT                 = 0x1403 as GLenum
+			const INT                            = 0x1404 as GLenum
+			const UNSIGNED_INT                   = 0x1405 as GLenum
+			const FLOAT                          = 0x1406 as GLenum
+
+			# PixelFormat
+			const DEPTH_COMPONENT                = 0x1902 as GLenum
+			const ALPHA                          = 0x1906 as GLenum
+			const RGB                            = 0x1907 as GLenum
+			const RGBA                           = 0x1908 as GLenum
+			const LUMINANCE                      = 0x1909 as GLenum
+			const LUMINANCE_ALPHA                = 0x190A as GLenum
+
+			# PixelType
+			# UNSIGNED_BYTE
+			const UNSIGNED_SHORT_4_4_4_4         = 0x8033 as GLenum
+			const UNSIGNED_SHORT_5_5_5_1         = 0x8034 as GLenum
+			const UNSIGNED_SHORT_5_6_5           = 0x8363 as GLenum
+
+			# Shaders
+			const FRAGMENT_SHADER                  = 0x8B30 as GLenum
+			const VERTEX_SHADER                    = 0x8B31 as GLenum
+			const MAX_VERTEX_ATTRIBS               = 0x8869 as GLenum
+			const MAX_VERTEX_UNIFORM_VECTORS       = 0x8DFB as GLenum
+			const MAX_VARYING_VECTORS              = 0x8DFC as GLenum
+			const MAX_COMBINED_TEXTURE_IMAGE_UNITS = 0x8B4D as GLenum
+			const MAX_VERTEX_TEXTURE_IMAGE_UNITS   = 0x8B4C as GLenum
+			const MAX_TEXTURE_IMAGE_UNITS          = 0x8872 as GLenum
+			const MAX_FRAGMENT_UNIFORM_VECTORS     = 0x8DFD as GLenum
+			const SHADER_TYPE                      = 0x8B4F as GLenum
+			const DELETE_STATUS                    = 0x8B80 as GLenum
+			const LINK_STATUS                      = 0x8B82 as GLenum
+			const VALIDATE_STATUS                  = 0x8B83 as GLenum
+			const ATTACHED_SHADERS                 = 0x8B85 as GLenum
+			const ACTIVE_UNIFORMS                  = 0x8B86 as GLenum
+			const ACTIVE_ATTRIBUTES                = 0x8B89 as GLenum
+			const SHADING_LANGUAGE_VERSION         = 0x8B8C as GLenum
+			const CURRENT_PROGRAM                  = 0x8B8D as GLenum
+
+			# StencilFunction
+			const NEVER                          = 0x0200 as GLenum
+			const LESS                           = 0x0201 as GLenum
+			const EQUAL                          = 0x0202 as GLenum
+			const LEQUAL                         = 0x0203 as GLenum
+			const GREATER                        = 0x0204 as GLenum
+			const NOTEQUAL                       = 0x0205 as GLenum
+			const GEQUAL                         = 0x0206 as GLenum
+			const ALWAYS                         = 0x0207 as GLenum
+
+			# StencilOp
+			# ZERO
+			const KEEP                           = 0x1E00 as GLenum
+			const REPLACE                        = 0x1E01 as GLenum
+			const INCR                           = 0x1E02 as GLenum
+			const DECR                           = 0x1E03 as GLenum
+			const INVERT                         = 0x150A as GLenum
+			const INCR_WRAP                      = 0x8507 as GLenum
+			const DECR_WRAP                      = 0x8508 as GLenum
+
+			# StringName
+			const VENDOR                         = 0x1F00 as GLenum
+			const RENDERER                       = 0x1F01 as GLenum
+			const VERSION                        = 0x1F02 as GLenum
+
+			# TextureMagFilter
+			const NEAREST                        = 0x2600 as GLenum
+			const LINEAR                         = 0x2601 as GLenum
+
+			# TextureMinFilter
+			# NEAREST
+			# LINEAR
+			const NEAREST_MIPMAP_NEAREST         = 0x2700 as GLenum
+			const LINEAR_MIPMAP_NEAREST          = 0x2701 as GLenum
+			const NEAREST_MIPMAP_LINEAR          = 0x2702 as GLenum
+			const LINEAR_MIPMAP_LINEAR           = 0x2703 as GLenum
+
+			# TextureParameterName
+			const TEXTURE_MAG_FILTER             = 0x2800 as GLenum
+			const TEXTURE_MIN_FILTER             = 0x2801 as GLenum
+			const TEXTURE_WRAP_S                 = 0x2802 as GLenum
+			const TEXTURE_WRAP_T                 = 0x2803 as GLenum
+
+			# TextureTarget
+			const TEXTURE_2D                     = 0x0DE1 as GLenum
+			const TEXTURE                        = 0x1702 as GLenum
+
+			const TEXTURE_CUBE_MAP               = 0x8513 as GLenum
+			const TEXTURE_BINDING_CUBE_MAP       = 0x8514 as GLenum
+			const TEXTURE_CUBE_MAP_POSITIVE_X    = 0x8515 as GLenum
+			const TEXTURE_CUBE_MAP_NEGATIVE_X    = 0x8516 as GLenum
+			const TEXTURE_CUBE_MAP_POSITIVE_Y    = 0x8517 as GLenum
+			const TEXTURE_CUBE_MAP_NEGATIVE_Y    = 0x8518 as GLenum
+			const TEXTURE_CUBE_MAP_POSITIVE_Z    = 0x8519 as GLenum
+			const TEXTURE_CUBE_MAP_NEGATIVE_Z    = 0x851A as GLenum
+			const MAX_CUBE_MAP_TEXTURE_SIZE      = 0x851C as GLenum
+
+			# TextureUnit
+			def TEXTURE_N(index int) GLenum {
+				assert(index >= 0 && index <= 31)
+				return ((TEXTURE0 as int) + index) as GLenum
+			}
+			const TEXTURE0                       = 0x84C0 as GLenum
+			const TEXTURE1                       = 0x84C1 as GLenum
+			const TEXTURE2                       = 0x84C2 as GLenum
+			const TEXTURE3                       = 0x84C3 as GLenum
+			const TEXTURE4                       = 0x84C4 as GLenum
+			const TEXTURE5                       = 0x84C5 as GLenum
+			const TEXTURE6                       = 0x84C6 as GLenum
+			const TEXTURE7                       = 0x84C7 as GLenum
+			const TEXTURE8                       = 0x84C8 as GLenum
+			const TEXTURE9                       = 0x84C9 as GLenum
+			const TEXTURE10                      = 0x84CA as GLenum
+			const TEXTURE11                      = 0x84CB as GLenum
+			const TEXTURE12                      = 0x84CC as GLenum
+			const TEXTURE13                      = 0x84CD as GLenum
+			const TEXTURE14                      = 0x84CE as GLenum
+			const TEXTURE15                      = 0x84CF as GLenum
+			const TEXTURE16                      = 0x84D0 as GLenum
+			const TEXTURE17                      = 0x84D1 as GLenum
+			const TEXTURE18                      = 0x84D2 as GLenum
+			const TEXTURE19                      = 0x84D3 as GLenum
+			const TEXTURE20                      = 0x84D4 as GLenum
+			const TEXTURE21                      = 0x84D5 as GLenum
+			const TEXTURE22                      = 0x84D6 as GLenum
+			const TEXTURE23                      = 0x84D7 as GLenum
+			const TEXTURE24                      = 0x84D8 as GLenum
+			const TEXTURE25                      = 0x84D9 as GLenum
+			const TEXTURE26                      = 0x84DA as GLenum
+			const TEXTURE27                      = 0x84DB as GLenum
+			const TEXTURE28                      = 0x84DC as GLenum
+			const TEXTURE29                      = 0x84DD as GLenum
+			const TEXTURE30                      = 0x84DE as GLenum
+			const TEXTURE31                      = 0x84DF as GLenum
+			const ACTIVE_TEXTURE                 = 0x84E0 as GLenum
+
+			# TextureWrapMode
+			const REPEAT                         = 0x2901 as GLenum
+			const CLAMP_TO_EDGE                  = 0x812F as GLenum
+			const MIRRORED_REPEAT                = 0x8370 as GLenum
+
+			# Uniform Types
+			const FLOAT_VEC2                     = 0x8B50 as GLenum
+			const FLOAT_VEC3                     = 0x8B51 as GLenum
+			const FLOAT_VEC4                     = 0x8B52 as GLenum
+			const INT_VEC2                       = 0x8B53 as GLenum
+			const INT_VEC3                       = 0x8B54 as GLenum
+			const INT_VEC4                       = 0x8B55 as GLenum
+			const BOOL                           = 0x8B56 as GLenum
+			const BOOL_VEC2                      = 0x8B57 as GLenum
+			const BOOL_VEC3                      = 0x8B58 as GLenum
+			const BOOL_VEC4                      = 0x8B59 as GLenum
+			const FLOAT_MAT2                     = 0x8B5A as GLenum
+			const FLOAT_MAT3                     = 0x8B5B as GLenum
+			const FLOAT_MAT4                     = 0x8B5C as GLenum
+			const SAMPLER_2D                     = 0x8B5E as GLenum
+			const SAMPLER_CUBE                   = 0x8B60 as GLenum
+
+			# Vertex Arrays
+			const VERTEX_ATTRIB_ARRAY_ENABLED        = 0x8622 as GLenum
+			const VERTEX_ATTRIB_ARRAY_SIZE           = 0x8623 as GLenum
+			const VERTEX_ATTRIB_ARRAY_STRIDE         = 0x8624 as GLenum
+			const VERTEX_ATTRIB_ARRAY_TYPE           = 0x8625 as GLenum
+			const VERTEX_ATTRIB_ARRAY_NORMALIZED     = 0x886A as GLenum
+			const VERTEX_ATTRIB_ARRAY_POINTER        = 0x8645 as GLenum
+			const VERTEX_ATTRIB_ARRAY_BUFFER_BINDING = 0x889F as GLenum
+
+			# Read Format
+			const IMPLEMENTATION_COLOR_READ_TYPE   = 0x8B9A as GLenum
+			const IMPLEMENTATION_COLOR_READ_FORMAT = 0x8B9B as GLenum
+
+			# Shader Source
+			const COMPILE_STATUS                 = 0x8B81 as GLenum
+
+			# Shader Precision-Specified Types
+			const LOW_FLOAT                      = 0x8DF0 as GLenum
+			const MEDIUM_FLOAT                   = 0x8DF1 as GLenum
+			const HIGH_FLOAT                     = 0x8DF2 as GLenum
+			const LOW_INT                        = 0x8DF3 as GLenum
+			const MEDIUM_INT                     = 0x8DF4 as GLenum
+			const HIGH_INT                       = 0x8DF5 as GLenum
+
+			# Framebuffer Object.
+			const FRAMEBUFFER                    = 0x8D40 as GLenum
+			const RENDERBUFFER                   = 0x8D41 as GLenum
+
+			const RGBA4                          = 0x8056 as GLenum
+			const RGB5_A1                        = 0x8057 as GLenum
+			const RGB565                         = 0x8D62 as GLenum
+			const DEPTH_COMPONENT16              = 0x81A5 as GLenum
+			const STENCIL_INDEX                  = 0x1901 as GLenum
+			const STENCIL_INDEX8                 = 0x8D48 as GLenum
+			const DEPTH_STENCIL                  = 0x84F9 as GLenum
+
+			const RENDERBUFFER_WIDTH             = 0x8D42 as GLenum
+			const RENDERBUFFER_HEIGHT            = 0x8D43 as GLenum
+			const RENDERBUFFER_INTERNAL_FORMAT   = 0x8D44 as GLenum
+			const RENDERBUFFER_RED_SIZE          = 0x8D50 as GLenum
+			const RENDERBUFFER_GREEN_SIZE        = 0x8D51 as GLenum
+			const RENDERBUFFER_BLUE_SIZE         = 0x8D52 as GLenum
+			const RENDERBUFFER_ALPHA_SIZE        = 0x8D53 as GLenum
+			const RENDERBUFFER_DEPTH_SIZE        = 0x8D54 as GLenum
+			const RENDERBUFFER_STENCIL_SIZE      = 0x8D55 as GLenum
+
+			const FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE           = 0x8CD0 as GLenum
+			const FRAMEBUFFER_ATTACHMENT_OBJECT_NAME           = 0x8CD1 as GLenum
+			const FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL         = 0x8CD2 as GLenum
+			const FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE = 0x8CD3 as GLenum
+
+			const COLOR_ATTACHMENT0              = 0x8CE0 as GLenum
+			const DEPTH_ATTACHMENT               = 0x8D00 as GLenum
+			const STENCIL_ATTACHMENT             = 0x8D20 as GLenum
+			const DEPTH_STENCIL_ATTACHMENT       = 0x821A as GLenum
+
+			const NONE                           = 0 as GLenum
+
+			const FRAMEBUFFER_COMPLETE                      = 0x8CD5 as GLenum
+			const FRAMEBUFFER_INCOMPLETE_ATTACHMENT         = 0x8CD6 as GLenum
+			const FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT = 0x8CD7 as GLenum
+			const FRAMEBUFFER_INCOMPLETE_DIMENSIONS         = 0x8CD9 as GLenum
+			const FRAMEBUFFER_UNSUPPORTED                   = 0x8CDD as GLenum
+
+			const FRAMEBUFFER_BINDING            = 0x8CA6 as GLenum
+			const RENDERBUFFER_BINDING           = 0x8CA7 as GLenum
+			const MAX_RENDERBUFFER_SIZE          = 0x84E8 as GLenum
+
+			const INVALID_FRAMEBUFFER_OPERATION  = 0x0506 as GLenum
+
+			# WebGL-specific enums
+			const UNPACK_FLIP_Y_WEBGL            = 0x9240 as GLenum
+			const UNPACK_PREMULTIPLY_ALPHA_WEBGL = 0x9241 as GLenum
+			const CONTEXT_LOST_WEBGL             = 0x9242 as GLenum
+			const UNPACK_COLORSPACE_CONVERSION_WEBGL = 0x9243 as GLenum
+			const BROWSER_DEFAULT_WEBGL          = 0x9244 as GLenum
+		}
+	}
+}

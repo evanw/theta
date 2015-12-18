@@ -1,0 +1,58 @@
+namespace Converter {
+	var _float Float32Array
+	var _int Int32Array
+	var _bytes Uint8Array
+	var _isReady = false
+
+	def setup {
+		if _isReady {
+			return
+		}
+		_isReady = true
+		_float = Float32Array.new(1)
+		_int = Int32Array.new(_float.buffer)
+		_bytes = Uint8Array.new(_float.buffer)
+	}
+
+	def floatToInt(value double) int {
+		setup
+		_float[0] = value
+		return _int[0]
+	}
+
+	def intToFloat(value int) double {
+		setup
+		_int[0] = value
+		return _float[0]
+	}
+
+	def floatToBytes(value double) Uint8Array {
+		setup
+		_float[0] = value
+		return _bytes
+	}
+
+	def bytesToFloat(a int, b int, c int, d int) double {
+		setup
+		_bytes[0] = a
+		_bytes[1] = b
+		_bytes[2] = c
+		_bytes[3] = d
+		return _float[0]
+	}
+
+	def intToBytes(value int) Uint8Array {
+		setup
+		_int[0] = value
+		return _bytes
+	}
+
+	def bytesToInt(a int, b int, c int, d int) int {
+		setup
+		_bytes[0] = a
+		_bytes[1] = b
+		_bytes[2] = c
+		_bytes[3] = d
+		return _int[0]
+	}
+}

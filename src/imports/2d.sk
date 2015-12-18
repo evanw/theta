@@ -1,0 +1,145 @@
+if TARGET == .JAVASCRIPT {
+	class HTMLCanvasElement {
+		def getContext2D CanvasRenderingContext2D {
+			try { return (self as dynamic).getContext("2d") }
+			return null
+		}
+	}
+
+	@import {
+		class CanvasRenderingContext2D {
+			# back-reference to the canvas
+			const canvas HTMLCanvasElement
+
+			# state
+			def save # push state on state stack
+			def restore # pop state stack and restore state
+
+			# transformations (default: transform is the identity matrix)
+			def scale(x double, y double)
+			def rotate(angle double)
+			def translate(x double, y double)
+			def transform(a double, b double, c double, d double, e double, f double)
+			def setTransform(a double, b double, c double, d double, e double, f double)
+
+			# compositing
+			var globalAlpha double # (default: 1.0)
+			var globalCompositeOperation string # (default: "source-over")
+
+			# colors and styles
+			def strokeStyle string { return (self as dynamic).strokeStyle } # (default: "black")
+			def fillStyle string { return (self as dynamic).fillStyle } # (default: "black")
+			def strokeStyle=(value string) { (self as dynamic).strokeStyle = value }
+			def strokeStyle=(value CanvasPattern) { (self as dynamic).strokeStyle = value }
+			def strokeStyle=(value CanvasGradient) { (self as dynamic).strokeStyle = value }
+			def fillStyle=(value string) { (self as dynamic).fillStyle = value }
+			def fillStyle=(value CanvasPattern) { (self as dynamic).fillStyle = value }
+			def fillStyle=(value CanvasGradient) { (self as dynamic).fillStyle = value }
+			def createLinearGradient(x0 double, y0 double, x1 double, y1 double) CanvasGradient
+			def createRadialGradient(x0 double, y0 double, r0 double, x1 double, y1 double, r1 double) CanvasGradient
+			def createPattern(image HTMLImageElement, repetition string) CanvasPattern
+			def createPattern(image HTMLCanvasElement, repetition string) CanvasPattern
+			def createPattern(image HTMLVideoElement, repetition string) CanvasPattern
+
+			# shadows
+			var shadowOffsetX double # (default: 0)
+			var shadowOffsetY double # (default: 0)
+			var shadowBlur double # (default: 0)
+			var shadowColor string # (default: "transparent black")
+
+			# rects
+			def clearRect(x double, y double, w double, h double)
+			def fillRect(x double, y double, w double, h double)
+			def strokeRect(x double, y double, w double, h double)
+
+			# path API
+			def beginPath
+			def fill
+			def fill(fillRule string)
+			def stroke
+			def drawFocusIfNeeded(element HTMLElement)
+			def clip
+			def isPointInPath(x double, y double) bool
+
+			# shared path API methods
+			def closePath
+			def moveTo(x double, y double)
+			def lineTo(x double, y double)
+			def quadraticCurveTo(cpx double, cpy double, x double, y double)
+			def bezierCurveTo(cp1x double, cp1y double, cp2x double, cp2y double, x double, y double)
+			def arcTo(x1 double, y1 double, x2 double, y2 double, radius double)
+			def rect(x double, y double, w double, h double)
+			def arc(x double, y double, radius double, startAngle double, endAngle double)
+			def arc(x double, y double, radius double, startAngle double, endAngle double, anticlockwise bool)
+
+			# text
+			def fillText(text string, x double, y double, maxWidth double)
+			def strokeText(text string, x double, y double, maxWidth double)
+			def fillText(text string, x double, y double)
+			def strokeText(text string, x double, y double)
+			def measureText(text string) TextMetrics
+
+			# line caps/joins
+			var lineWidth double # (default: 1)
+			var lineCap string # "butt", "round", "square" (default: "butt")
+			var lineJoin string # "round", "bevel", "miter" (default: "miter")
+			var miterLimit double # (default: 10)
+
+			# dashed lines
+			def setLineDash(segments List<double>) # (default: empty)
+			def getLineDash List<double>
+			var lineDashOffset double
+
+			# text
+			var font string # (default: "10px sans-serif")
+			var textAlign string # "start", "end", "left", "right", "center" (default: "start")
+			var textBaseline string # "top", "hanging", "middle", "alphabetic", "ideographic", "bottom" (default: "alphabetic")
+
+			# drawing images
+			def drawImage(image HTMLImageElement, dx double, dy double)
+			def drawImage(image HTMLImageElement, dx double, dy double, dw double, dh double)
+			def drawImage(image HTMLImageElement, sx double, sy double, sw double, sh double, dx double, dy double, dw double, dh double)
+			def drawImage(image HTMLCanvasElement, dx double, dy double)
+			def drawImage(image HTMLCanvasElement, dx double, dy double, dw double, dh double)
+			def drawImage(image HTMLCanvasElement, sx double, sy double, sw double, sh double, dx double, dy double, dw double, dh double)
+			def drawImage(image HTMLVideoElement, dx double, dy double)
+			def drawImage(image HTMLVideoElement, dx double, dy double, dw double, dh double)
+			def drawImage(image HTMLVideoElement, sx double, sy double, sw double, sh double, dx double, dy double, dw double, dh double)
+
+			# hit regions
+			def addHitRegion(options dynamic)
+			def removeHitRegion(id string)
+			def clearHitRegions
+
+			# pixel manipulation
+			def createImageData(sw int, sh int) ImageData
+			def createImageData(imagedata ImageData) ImageData
+			def getImageData(sx int, sy int, sw int, sh int) ImageData
+			def putImageData(imagedata ImageData, dx int, dy int, dirtyX int, dirtyY int, dirtyWidth int, dirtyHeight int)
+			def putImageData(imagedata ImageData, dx int, dy int)
+
+			# smoothing
+			var webkitImageSmoothingEnabled bool
+			var mozImageSmoothingEnabled bool
+			var msImageSmoothingEnabled bool
+			var imageSmoothingEnabled bool
+		}
+
+		class CanvasGradient {
+			def addColorStop(offset double, color string)
+		}
+
+		class CanvasPattern {
+		}
+
+		class TextMetrics {
+			const width double
+		}
+
+		class ImageData {
+			const width int
+			const height int
+			const data Uint8ClampedArray
+		}
+	}
+}

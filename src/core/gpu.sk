@@ -1,0 +1,256 @@
+namespace GPU {
+	enum BlendOperation {
+		ZERO
+		ONE
+
+		SOURCE_COLOR
+		TARGET_COLOR
+		INVERSE_SOURCE_COLOR
+		INVERSE_TARGET_COLOR
+
+		SOURCE_ALPHA
+		TARGET_ALPHA
+		INVERSE_SOURCE_ALPHA
+		INVERSE_TARGET_ALPHA
+
+		CONSTANT
+		INVERSE_CONSTANT
+	}
+
+	enum Clear {
+		ALL
+		COLOR
+		DEPTH_STENCIL
+	}
+
+	enum Primitive {
+		TRIANGLES
+		TRIANGLE_STRIP
+	}
+
+	enum Comparison {
+		ALWAYS
+		EQUAL
+		GREATER_THAN
+		GREATER_THAN_OR_EQUAL
+		LESS_THAN
+		LESS_THAN_OR_EQUAL
+		NEVER
+		NOT_EQUAL
+	}
+
+	enum StencilOperation {
+		DECREMENT_CLAMP
+		DECREMENT_WRAP
+		INCREMENT_CLAMP
+		INCREMENT_WRAP
+		INVERT
+		KEEP
+		REPLACE
+		ZERO
+	}
+
+	class StencilFaceState {
+		const reference int
+		const comparison Comparison
+		const readMask int
+		const writeMask int
+		const stencilFail StencilOperation
+		const stencilPassDepthFail StencilOperation
+		const stencilPassDepthPass StencilOperation
+
+		def equals(other StencilFaceState) bool {
+			return
+				self == other ||
+				reference == other.reference &&
+				comparison == other.comparison &&
+				readMask == other.readMask &&
+				writeMask == other.writeMask &&
+				stencilFail == other.stencilFail &&
+				stencilPassDepthFail == other.stencilPassDepthFail &&
+				stencilPassDepthPass == other.stencilPassDepthPass
+		}
+	}
+
+	namespace StencilFaceState {
+		const NONE = new(0, .NEVER, 0, -1, .KEEP, .KEEP, .KEEP)
+	}
+
+	class StencilState {
+		const isEnabled bool
+		const frontFace StencilFaceState
+		const backFace StencilFaceState
+
+		def new {
+			isEnabled = false
+			frontFace = .NONE
+			backFace = .NONE
+		}
+
+		def new(bothFaces StencilFaceState) {
+			isEnabled = true
+			frontFace = bothFaces
+			backFace = bothFaces
+		}
+
+		def new(frontFace StencilFaceState, backFace StencilFaceState) {
+			isEnabled = true
+			self.frontFace = frontFace
+			self.backFace = backFace
+		}
+
+		def equals(other StencilState) bool {
+			return
+				self == other ||
+				isEnabled == other.isEnabled &&
+				frontFace.equals(other.frontFace) &&
+				backFace.equals(other.backFace)
+		}
+	}
+
+	namespace StencilState {
+		const NONE = new
+	}
+
+	interface Context {
+		def addContextResetHandler(callback fn())
+		def beginFrame
+		def clear(mode Clear) { clear(mode, .TRANSPARENT) }
+		def clear(mode Clear, color Color)
+		def createMaterial(format VertexFormat, vertexSource string, fragmentSource string) Material
+		def createTexture(format TextureFormat, width int, height int) Texture { return createTexture(format, width, height, null) }
+		def createTexture(format TextureFormat, width int, height int, pixels Uint8Array) Texture
+		def createTextureSet(color Texture, stencil Texture) TextureSet
+		def createVertexBuffer(byteCount int) VertexBuffer
+		def currentTextureSet TextureSet
+		def draw(primitive Primitive, material Material, area BufferArea)
+		def endFrame
+		def height int
+		def removeContextResetHandler(callback fn())
+		def resize(width int, height int)
+		def setStencilState(state StencilState)
+		def setTextureSet(textureSet TextureSet)
+		def setViewport(x int, y int, width int, height int)
+		def width int
+
+		def setBlendState(sourceColor BlendOperation, targetColor BlendOperation, sourceAlpha BlendOperation, targetAlpha BlendOperation, constant double)
+		def setCopyBlendState { setBlendState(.ONE, .ZERO, .ONE, .ZERO) }
+		def setKeepBlendState { setBlendState(.ZERO, .ONE, .ZERO, .ONE) }
+		def setInterpolateBlendState(t double) { setBlendState(.CONSTANT, .INVERSE_CONSTANT, .CONSTANT, .INVERSE_CONSTANT, t) }
+		def setPremultipliedBlendState { setBlendState(.ONE, .INVERSE_SOURCE_ALPHA, .ONE, .INVERSE_SOURCE_ALPHA) }
+		def setUnpremultipliedBlendState { setBlendState(.SOURCE_ALPHA, .INVERSE_SOURCE_ALPHA, .SOURCE_ALPHA, .INVERSE_SOURCE_ALPHA) }
+		def setBlendState(sourceColor BlendOperation, targetColor BlendOperation, sourceAlpha BlendOperation, targetAlpha BlendOperation) {
+			setBlendState(sourceColor, targetColor, sourceAlpha, targetAlpha, 0)
+		}
+	}
+
+	interface Material {
+		def context Context
+		def format VertexFormat
+		def fragmentSource string
+		def vertexSource string
+		def setUniformFloat(name string, x double)
+		def setUniformInt(name string, x int)
+		def setUniformVec2(name string, x double, y double)
+		def setUniformVec2(name string, v Vector) { setUniformVec2(name, v.x, v.y) }
+		def setUniformVec3(name string, x double, y double, z double)
+		def setUniformVec4(name string, x double, y double, z double, w double)
+		def setUniformVec4(name string, c Color) { setUniformVec4(name, c.redF, c.greenF, c.blueF, c.alphaF) }
+		def setUniformMat3(name string, m00 double, m01 double, m02 double, m10 double, m11 double, m12 double, m20 double, m21 double, m22 double)
+		def setUniformMat3(name string, t Transform) { setUniformMat3(name, t.m00, t.m01, t.m02, t.m10, t.m11, t.m12, 0, 0, 1) }
+		def setUniformSampler(name string, texture Texture, index int)
+	}
+
+	enum AttributeType {
+		FLOAT
+		BYTE
+
+		def byteLength int {
+			return self == FLOAT ? 4 : 1
+		}
+	}
+
+	class Attribute {
+		const name string
+		const type AttributeType
+		const count int
+		const byteOffset int
+	}
+
+	class VertexFormat {
+		var _attributes List<Attribute> = []
+		var _stride = 0
+
+		def attributes List<Attribute> {
+			return _attributes
+		}
+
+		def stride int {
+			return _stride
+		}
+
+		def add(name string, type AttributeType, count int) VertexFormat {
+			_attributes.append(Attribute.new(name, type, count, _stride))
+			_stride += count * type.byteLength
+			return self
+		}
+	}
+
+	interface VertexBuffer {
+		def byteCount int
+		def context Context
+		def move(sourceByteOffset int, targetByteOffset int, byteCount int)
+		def upload(bytes Uint8Array) { upload(bytes, 0) }
+		def upload(bytes Uint8Array, byteOffset int)
+	}
+
+	enum PixelFormat {
+		RGBA_32
+		DEPTH_24_STENCIL_8
+
+		def byteLength int {
+			return 4
+		}
+	}
+
+	enum PixelFilter {
+		NEAREST
+		LINEAR
+	}
+
+	enum PixelWrap {
+		REPEAT
+		CLAMP
+	}
+
+	class TextureFormat {
+		const pixelFormat PixelFormat
+		const minFilter PixelFilter
+		const magFilter PixelFilter
+		const wrap PixelWrap
+	}
+
+	namespace TextureFormat {
+		const RGBA_LINEAR_CLAMP = new(.RGBA_32, .LINEAR, .LINEAR, .CLAMP)
+		const RGBA_LINEAR_MIN_NEAREST_MAG_CLAMP = new(.RGBA_32, .LINEAR, .NEAREST, .CLAMP)
+		const RGBA_NEAREST_CLAMP = new(.RGBA_32, .NEAREST, .NEAREST, .CLAMP)
+		const STENCIL = new(.DEPTH_24_STENCIL_8, .NEAREST, .NEAREST, .CLAMP)
+	}
+
+	interface Texture {
+		def context Context
+		def format TextureFormat
+		def height int
+		def resize(width int, height int, pixels Uint8Array)
+		def setFormat(format TextureFormat)
+		def width int
+	}
+
+	interface TextureSet {
+		def context Context
+		def colorTexture Texture
+		def depthStencilTexture Texture
+		def setColor(texture Texture)
+		def setDepthStencil(texture Texture)
+	}
+}

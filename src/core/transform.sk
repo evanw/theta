@@ -1,0 +1,153 @@
+class Transform {
+	var m00 = 1.0
+	var m01 = 0.0
+	var m02 = 0.0
+	var m10 = 0.0
+	var m11 = 1.0
+	var m12 = 0.0
+
+	def new {
+	}
+
+	def new(t Transform) {
+		m00 = t.m00
+		m01 = t.m01
+		m02 = t.m02
+		m10 = t.m10
+		m11 = t.m11
+		m12 = t.m12
+	}
+
+	def new(m00 double, m01 double, m02 double, m10 double, m11 double, m12 double) {
+		self.m00 = m00
+		self.m01 = m01
+		self.m02 = m02
+		self.m10 = m10
+		self.m11 = m11
+		self.m12 = m12
+	}
+
+	def clone Transform {
+		return new(m00, m01, m02, m10, m11, m12)
+	}
+
+	def equals(t Transform) bool {
+		return
+			m00 == t.m00 &&
+			m01 == t.m01 &&
+			m02 == t.m02 &&
+			m10 == t.m10 &&
+			m11 == t.m11 &&
+			m12 == t.m12
+	}
+
+	def translate(v Vector) {
+		translate(v.x, v.y)
+	}
+
+	def translate(x double, y double) {
+		m02 += x * m00 + y * m01
+		m12 += x * m10 + y * m11
+	}
+
+	def rotate(radians double) {
+		var s = Math.sin(radians)
+		var c = Math.cos(radians)
+		var v00 = c * m00 + s * m01
+		var v01 = c * m01 - s * m00
+		var v10 = c * m10 + s * m11
+		var v11 = c * m11 - s * m10
+		m00 = v00
+		m01 = v01
+		m10 = v10
+		m11 = v11
+	}
+
+	def scale(d double) {
+		scale(d, d)
+	}
+
+	def scale(v Vector) {
+		scale(v.x, v.y)
+	}
+
+	def scale(x double, y double) {
+		m00 *= x
+		m01 *= y
+		m10 *= x
+		m11 *= y
+	}
+
+	def multiply(t Transform) {
+		var v00 = m00 * t.m00 + m01 * t.m10
+		var v01 = m00 * t.m01 + m01 * t.m11
+		var v02 = m00 * t.m02 + m01 * t.m12 + m02
+		var v10 = m10 * t.m00 + m11 * t.m10
+		var v11 = m10 * t.m01 + m11 * t.m11
+		var v12 = m10 * t.m02 + m11 * t.m12 + m12
+		m00 = v00
+		m01 = v01
+		m02 = v02
+		m10 = v10
+		m11 = v11
+		m12 = v12
+	}
+
+	def invert bool {
+		var determinant = 1 / (m00 * m11 - m01 * m10)
+		if determinant.isNaN {
+			return false
+		}
+		var v00 = m11 * determinant
+		var v01 = -m01 * determinant
+		var v02 = (m01 * m12 - m11 * m02) * determinant
+		var v10 = -m10 * determinant
+		var v11 = m00 * determinant
+		var v12 = (m10 * m02 - m00 * m12) * determinant
+		m00 = v00
+		m01 = v01
+		m02 = v02
+		m10 = v10
+		m11 = v11
+		m12 = v12
+		return true
+	}
+
+	def transformPoint(point Vector) {
+		var x = m00 * point.x + m01 * point.y + m02
+		var y = m10 * point.x + m11 * point.y + m12
+		point.x = x
+		point.y = y
+	}
+
+	def transformDirection(direction Vector) {
+		var x = m00 * direction.x + m01 * direction.y
+		var y = m10 * direction.x + m11 * direction.y
+		direction.x = x
+		direction.y = y
+	}
+
+	def set(m00 double, m01 double, m02 double, m10 double, m11 double, m12 double) Transform {
+		self.m00 = m00
+		self.m01 = m01
+		self.m02 = m02
+		self.m10 = m10
+		self.m11 = m11
+		self.m12 = m12
+		return self
+	}
+
+	def set(t Transform) Transform {
+		m00 = t.m00
+		m01 = t.m01
+		m02 = t.m02
+		m10 = t.m10
+		m11 = t.m11
+		m12 = t.m12
+		return self
+	}
+
+	def toString string {
+		return "Transform(\(m00), \(m01), \(m02), \(m10), \(m11), \(m12))"
+	}
+}

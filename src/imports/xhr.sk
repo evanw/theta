@@ -1,0 +1,35 @@
+if TARGET == .JAVASCRIPT {
+	@import
+	class XMLHttpRequest {
+		def new
+		def getResponseHeader(key string) string
+		def setRequestHeader(key string, value string)
+		def open(method string, url string)
+		@prefer
+		def send(data ArrayBufferView)
+		def send(data FormData)
+		def send
+		def abort
+
+		const status int
+		const response dynamic
+		const responseText string
+		const readyState int
+
+		var onreadystatechange fn()
+		var onabort fn()
+		var onerror fn()
+		var onload fn()
+		var onloadend fn()
+		var onloadstart fn()
+		var onprogress fn()
+		var ontimeout fn()
+		var responseType string
+
+		const UNSENT = 0
+		const OPENED = 1
+		const HEADERS_RECEIVED = 2
+		const LOADING = 3
+		const DONE = 4
+	}
+}

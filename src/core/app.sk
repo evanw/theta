@@ -1,0 +1,72 @@
+class App {
+	var _canvas = Canvas.new
+	var _fps = 60.0
+	var _isInvalid = true
+	var _validFrames = 0
+
+	var _origin = Vector.new(window.innerWidth / 2, window.innerHeight / 2)
+	var _scale = 100.0
+
+	def new {
+		_addEventHandlers
+		_startRenderLoop
+	}
+
+	def _addEventHandlers {
+		_canvas.onResize = => {
+			_draw
+		}
+
+		_canvas.onScroll = (x, y) => {
+			_origin.x -= x
+			_origin.y -= y
+			_invalidate
+		}
+
+		_canvas.onPinch = (x, y, delta) => {
+			var ratio = Math.pow(0.98, delta)
+			_origin.x += (x - _origin.x) * (1 - ratio)
+			_origin.y += (y - _origin.y) * (1 - ratio)
+			_scale *= ratio
+			_invalidate
+		}
+	}
+
+	def _invalidate {
+		_isInvalid = true
+	}
+
+	def _startRenderLoop {
+		var tick fn() = => {
+			_tick
+			requestAnimationFrame(tick)
+		}
+		tick()
+	}
+
+	def _tick {
+		if _isInvalid {
+			_validFrames = 0
+			_isInvalid = false
+			_draw
+		}
+
+		# Chrome must render at least 10fps to avoid stutter when starting to render at 60fps again
+		else if ++_validFrames < 5 * 60 && _validFrames % 6 == 0 {
+			_draw
+		}
+	}
+
+	def _draw {
+		_canvas.clear
+		_canvas.drawFunction(_origin, _scale)
+		_canvas.drawGrid(_origin, _scale)
+	}
+}
+
+namespace App {
+	@entry
+	def main {
+		new
+	}
+}
