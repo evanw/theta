@@ -1,19 +1,22 @@
+class GlyphInstance {
+	var glyph Glyph = null
+	var offset = Vector.new
+	var scale = 0.0
+}
+
 class Canvas {
-	var _font Font
-	var _quadFormat = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
-	var _stencilFormat = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION4, .FLOAT, 4)
 	var _context GPU.Context
 	var _pool GPU.BufferPool
 	var _smooth GPU.SmoothRenderer
 	var _demoMaterial GPU.Material
-	var _stencilMaterial GPU.Material
-	var _coverMaterial GPU.Material
-	var _copyMaterial GPU.Material
+	var _glyphMaterial GPU.Material
+	var _textMaterial GPU.Material
+	var _font Font
 	var _quad GPU.BufferArea
-	var _glyph GPU.BufferArea
 	var _color GPU.Texture
-	var _depth GPU.Texture
 	var _target GPU.TextureSet
+	var _instances List<GlyphInstance> = []
+	var _usedInstances = 0
 
 	# Viewport size
 	var _width = 0
@@ -25,21 +28,22 @@ class Canvas {
 	var onPinch fn(double, double, double) = null
 	var onResize fn() = null
 
+	# Temporary objects to avoid GC
+	var _transformA = Transform.new
+	var _transformB = Transform.new
+
 	def new(fontData DataArray) {
-		_font = Font.new(fontData)
 		_context = GPU.HTMLContext.new
 		_pool = GPU.BufferPool.new(_context)
 		_smooth = GPU.SmoothRenderer.new(_context, _pool)
 		(_context as GPU.HTMLContext).gl.getExtension("OES_standard_derivatives")
-		_demoMaterial = _context.createMaterial(_quadFormat, GLSLX_SOURCE_DEMO_VERTEX, GLSLX_SOURCE_DEMO_FRAGMENT)
-		_stencilMaterial = _context.createMaterial(_stencilFormat, GLSLX_SOURCE_STENCIL_VERTEX, GLSLX_SOURCE_STENCIL_FRAGMENT)
-		_coverMaterial = _context.createMaterial(_quadFormat, GLSLX_SOURCE_COVER_VERTEX, GLSLX_SOURCE_COVER_FRAGMENT)
-		_copyMaterial = _context.createMaterial(_quadFormat, GLSLX_SOURCE_COPY_VERTEX, GLSLX_SOURCE_COPY_FRAGMENT)
-		_quad = _pool.allocate(_quadFormat, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
-		_glyph = _pool.allocate(_stencilFormat, _font.glyph('β').vertices.bytes)
+		_demoMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_DEMO_VERTEX, GLSLX_SOURCE_DEMO_FRAGMENT)
+		_glyphMaterial = _context.createMaterial(Glyph.VERTEX_FORMAT, GLSLX_SOURCE_GLYPH_VERTEX, GLSLX_SOURCE_GLYPH_FRAGMENT)
+		_textMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_TEXT_VERTEX, GLSLX_SOURCE_TEXT_FRAGMENT)
+		_font = Font.new(fontData, _pool)
+		_quad = _pool.allocate(QUAD_FORMAT, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
 		_color = _context.createTexture(.RGBA_NEAREST_CLAMP, 0, 0)
-		_depth = _context.createTexture(.DEPTH_STENCIL, 0, 0)
-		_target = _context.createTextureSet(_color, _depth)
+		_target = _context.createTextureSet(_color)
 		_attachToDOM(_context as GPU.HTMLContext)
 	}
 
@@ -57,7 +61,6 @@ class Canvas {
 
 			context.resize(width, height)
 			_color.resize(width, height, null)
-			_depth.resize(width, height, null)
 
 			var transform = Transform.new
 			transform.translate(-1, 1)
@@ -90,30 +93,103 @@ class Canvas {
 		resize()
 	}
 
-	def clear {
+	def beginFrame {
+		_usedInstances = 0
 		_context.setCopyBlendState
-		_context.clear(.ALL, .WHITE)
+		_context.clear(.WHITE)
+	}
+
+	def _addGlyph(codePoint int, offsetX double, offsetY double, scale double) Glyph {
+		if _usedInstances == _instances.count {
+			_instances.append(GlyphInstance.new)
+		}
+
+		var instance = _instances[_usedInstances]
+		instance.glyph = _font.glyph(codePoint)
+		instance.offset.set(offsetX, offsetY + _font.ascender * scale)
+		instance.scale = scale
+		_usedInstances++
+
+		assert(_usedInstances <= _instances.count)
+		assert(instance.glyph != null)
+		return instance.glyph
+	}
+
+	def _computeTextWidth(text string, scale double) double {
+		var width = 0.0
+		for i in 0..text.count {
+			width += scale * _font.glyph(text[i]).advanceWidth
+		}
+		return width
+	}
+
+	def _addText(text string, offsetX double, offsetY double, scale double) {
+		for i in 0..text.count {
+			offsetX += scale * _addGlyph(text[i], offsetX, offsetY, scale).advanceWidth
+		}
+	}
+
+	def _formatNumber(value double) string {
+		return (+(value as dynamic).toFixed(6)).toString()
 	}
 
 	def drawGrid(origin Vector, scale double) {
-		var log = Math.log(scale / 64) / Math.log(10)
-		var step = Math.pow(10, Math.round(log))
+		# Grid lines
+		var step = Math.pow(10, Math.round(Math.log(scale / 64) / Math.log(10)))
 		var ratio = step / scale
 		var left = Math.ceil(-origin.x * ratio) as int
 		var top = Math.ceil(-origin.y * ratio) as int
 		var right = Math.ceil((_width - origin.x) * ratio) as int
 		var bottom = Math.ceil((_height - origin.y) * ratio) as int
 
+		# Horizontal axis
 		for x in left..right {
 			var tx = origin.x + x * scale / step
 			_smooth.strokeLine(tx, 0, tx, _height, x == 0 ? .BLACK : x % 10 == 0 ? GRID_DARK : GRID_LIGHT, x == 0 ? 2 : 1)
 		}
 
+		# Vertical axis
 		for y in top..bottom {
 			var ty = origin.y + y * scale / step
 			_smooth.strokeLine(0, ty, _width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK : GRID_LIGHT, y == 0 ? 2 : 1)
 		}
 
+		# Coordinate text and tick marks
+		var log = Math.log(scale / 100) / Math.log(10)
+		var intPart = Math.floor(log)
+		var fractPart = log - intPart
+		var textStep = Math.pow(10, intPart) * (
+			fractPart > Math.log(5) / Math.log(10) ? 5 :
+			fractPart > Math.log(2) / Math.log(10) ? 2 :
+			1)
+		var textRatio = textStep / scale
+		var textLeft = Math.ceil((-100 - origin.x) * textRatio) as int
+		var textTop = Math.ceil((-100 - origin.y) * textRatio) as int
+		var textRight = Math.ceil((_width - origin.x) * textRatio) as int
+		var textBottom = Math.ceil((_height - origin.y) * textRatio) as int
+
+		# Horizontal axis
+		var textY = Math.clamp(origin.y, 0, _height - GRID_FONT_SIZE * 1.3)
+		for x in textLeft..textRight {
+			var tx = origin.x + x * scale / textStep
+			_smooth.strokeLine(tx, origin.y - GRID_TICK_SIZE, tx, origin.y + GRID_TICK_SIZE, .BLACK, 2)
+			_addText(_formatNumber(x / textStep), tx + GRID_FONT_SIZE * 0.3, textY + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE)
+		}
+
+		# Vertical axis
+		var textX = Math.max(origin.x, 0) + GRID_FONT_SIZE * 0.3
+		for y in textTop..textBottom {
+			if y != 0 {
+				var text = _formatNumber(y / textStep)
+				var ty = origin.y + y * scale / textStep
+				_smooth.strokeLine(origin.x - GRID_TICK_SIZE, ty, origin.x + GRID_TICK_SIZE, ty, .BLACK, 2)
+				_addText(text, Math.min(textX, _width - _computeTextWidth(text, GRID_FONT_SIZE) - GRID_FONT_SIZE * 0.3),
+					ty + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE)
+			}
+		}
+	}
+
+	def drawSmoothGeometry {
 		_context.setPremultipliedBlendState
 		_smooth.flush
 	}
@@ -122,38 +198,66 @@ class Canvas {
 		_demoMaterial.setUniformVec4(GLSLX_NAME_VALUE4, origin.x, origin.y, scale, _height)
 		_context.setPremultipliedBlendState
 		_context.draw(.TRIANGLE_STRIP, _demoMaterial, _quad)
+	}
 
-		var transform = Transform.new
-		transform.translate(-1, 1)
-		transform.scale(2.0 / _width, -2.0 / _height)
-		transform.translate(origin)
-		transform.scale(scale)
+	def drawText(origin Vector, scale double) {
+		_transformA.reset
+		_transformA.translate(-1, 1)
+		_transformA.scale(2.0 / _width, -2.0 / _height)
 
-		# _context.setTextureSet(_target)
-		# _context.clear(.ALL, .TRANSPARENT)
+		# Switch to the offscreen render target
+		_context.setTextureSet(_target)
+		_context.clear(.TRANSPARENT)
+		_context.setViewport(0, 0, _width, _height)
+		_context.setAddBlendState
 
-		_context.setKeepBlendState
-		_context.setStencilState(XOR_STATE)
-		_stencilMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, transform)
-		_context.draw(.TRIANGLES, _stencilMaterial, _glyph)
+		# Take multiple samples of glyph outlines using the GPU
+		for i in 0.._usedInstances {
+			var instance = _instances[i]
+			for offset in JITTER_PATTERN {
+				_transformB.set(_transformA)
+				_transformB.translate(instance.offset)
+				_transformB.translate(offset)
+				_transformB.scale(instance.scale)
+				_glyphMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformB)
+				_context.draw(.TRIANGLES, _glyphMaterial, instance.glyph.area)
+			}
+		}
 
-		_context.setPremultipliedBlendState
-		_context.setStencilState(NONZERO_STATE)
-		_coverMaterial.setUniformVec4(GLSLX_NAME_VALUE4, 0, 0, 0, 1)
-		_context.draw(.TRIANGLE_STRIP, _coverMaterial, _quad)
-
-		_context.setStencilState(.NONE)
+		# Composite the offscreen render target back onto the canvas using the non-zero winding rule
 		_context.setTextureSet(null)
-
-		# _context.setPremultipliedBlendState
-		# _copyMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
-		# _context.draw(.TRIANGLE_STRIP, _copyMaterial, _quad)
+		_context.setPremultipliedBlendState
+		_textMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
+		_context.draw(.TRIANGLE_STRIP, _textMaterial, _quad)
 	}
 }
 
 namespace Canvas {
+	const GRID_FONT_SIZE = 16
+	const GRID_TICK_SIZE = 5
 	const GRID_LIGHT = Color.new(0, 0, 0, 31)
 	const GRID_DARK = Color.new(0, 0, 0, 127)
-	const XOR_STATE = GPU.StencilState.new(GPU.StencilFaceState.new(0, .ALWAYS, 1, 1, .INVERT, .INVERT, .INVERT))
-	const NONZERO_STATE = GPU.StencilState.new(GPU.StencilFaceState.new(0, .NOT_EQUAL, 1, 1, .ZERO, .ZERO, .ZERO))
+	const QUAD_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
+
+	if true {
+		# 8x MSAA pattern
+		const JITTER_PATTERN = [
+			Vector.new(-3 / 16.0, -5 / 16.0),
+			Vector.new( 5 / 16.0,  1 / 16.0),
+			Vector.new(-1 / 16.0,  3 / 16.0),
+			Vector.new( 7 / 16.0, -7 / 16.0),
+			Vector.new( 1 / 16.0, -3 / 16.0),
+			Vector.new(-5 / 16.0,  5 / 16.0),
+			Vector.new( 3 / 16.0,  7 / 16.0),
+			Vector.new(-7 / 16.0, -1 / 16.0),
+		]
+	} else {
+		# 4x MSAA pattern
+		const JITTER_PATTERN = [
+			Vector.new( 1 / 8.0,  3 / 8.0),
+			Vector.new(-1 / 8.0, -3 / 8.0),
+			Vector.new( 3 / 8.0, -1 / 8.0),
+			Vector.new(-3 / 8.0,  1 / 8.0),
+		]
+	}
 }

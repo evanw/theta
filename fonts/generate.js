@@ -131,8 +131,7 @@ function process(options) {
 	}
 
 	for (var i = 0; i < glyphs.length; i++) {
-		var glyph = glyphs[i];
-		bytes.push.apply(bytes, glyph.path);
+		bytes.push.apply(bytes, glyphs[i].path);
 	}
 
 	var buffer = new Buffer(bytes);
@@ -155,7 +154,7 @@ function main() {
 				chars:
 					'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' +
 					'0123456789' +
-					'+−=<>≤≥,.',
+					'+−-=<>≤≥,.\\',
 					// ×·÷⁄√∫≠∏∑
 			},
 		],

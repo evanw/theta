@@ -21,34 +21,28 @@ export void smoothPathFragment() {
 	gl_FragColor = _coord4 * min(1.0, min(_coord2.x, _coord2.y));
 }
 
-export void copyVertex() {
-	_coord2 = position2 * 0.5 + 0.5;
-	gl_Position = vec4(position2, 0.0, 1.0);
-}
-
-export void copyFragment() {
-	gl_FragColor = texture2D(texture, _coord2);
-	// gl_FragColor.a = 1.0;
-}
-
-export void stencilVertex() {
+export void glyphVertex() {
 	_coord2 = position4.zw;
 	gl_Position = vec4(matrix3 * vec3(position4.xy, 1.0), 0.0).xywz;
 }
 
-export void stencilFragment() {
+export void glyphFragment() {
 	if (_coord2.x * _coord2.x - _coord2.y > 0.0) {
 		discard;
 	}
-	gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+	gl_FragColor = gl_FrontFacing
+		? vec4(1.0 / 255.0, 0.0, 0.0, 0.0)
+		: vec4(0.0, 1.0 / 255.0, 0.0, 0.0);
 }
 
-export void coverVertex() {
+export void textVertex() {
+	_coord2 = position2 * 0.5 + 0.5;
 	gl_Position = vec4(position2, 0.0, 1.0);
 }
 
-export void coverFragment() {
-	gl_FragColor = value4;
+export void textFragment() {
+	vec4 sample = texture2D(texture, _coord2);
+	gl_FragColor = vec4(0.0, 0.0, 0.0, abs(sample.x - sample.y) * (255.0 / 8.0));
 }
 
 export void demoVertex() {
@@ -85,10 +79,10 @@ export void demoFragment() {
 	float theta = atan(y, x);
 
 	// float z = cos(x - sin(y)) - cos(y + sin(x));
-	float z = y - (sin(x * 0.1) * 10.0 - sin(x));
+	// float z = y - (sin(x * 0.1) * 10.0 - sin(x));
 	// float z = y - (sin(x) + tan(x * 0.2));
 	// float z = sin(theta * 7.0) - sin(r);
-	// float z = sin(r + theta);
+	float z = sin(r + theta);
 	// float z = y - gamma(x + 1.0);
 
 	/*

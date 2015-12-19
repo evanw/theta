@@ -17,110 +17,19 @@ namespace GPU {
 		INVERSE_CONSTANT
 	}
 
-	enum Clear {
-		ALL
-		COLOR
-		DEPTH_STENCIL
-	}
-
 	enum Primitive {
 		TRIANGLES
 		TRIANGLE_STRIP
 	}
 
-	enum Comparison {
-		ALWAYS
-		EQUAL
-		GREATER_THAN
-		GREATER_THAN_OR_EQUAL
-		LESS_THAN
-		LESS_THAN_OR_EQUAL
-		NEVER
-		NOT_EQUAL
-	}
-
-	enum StencilOperation {
-		DECREMENT_CLAMP
-		DECREMENT_WRAP
-		INCREMENT_CLAMP
-		INCREMENT_WRAP
-		INVERT
-		KEEP
-		REPLACE
-		ZERO
-	}
-
-	class StencilFaceState {
-		const reference int
-		const comparison Comparison
-		const readMask int
-		const writeMask int
-		const stencilFail StencilOperation
-		const stencilPassDepthFail StencilOperation
-		const stencilPassDepthPass StencilOperation
-
-		def equals(other StencilFaceState) bool {
-			return
-				self == other ||
-				reference == other.reference &&
-				comparison == other.comparison &&
-				readMask == other.readMask &&
-				writeMask == other.writeMask &&
-				stencilFail == other.stencilFail &&
-				stencilPassDepthFail == other.stencilPassDepthFail &&
-				stencilPassDepthPass == other.stencilPassDepthPass
-		}
-	}
-
-	namespace StencilFaceState {
-		const NONE = new(0, .NEVER, 0, -1, .KEEP, .KEEP, .KEEP)
-	}
-
-	class StencilState {
-		const isEnabled bool
-		const frontFace StencilFaceState
-		const backFace StencilFaceState
-
-		def new {
-			isEnabled = false
-			frontFace = .NONE
-			backFace = .NONE
-		}
-
-		def new(bothFaces StencilFaceState) {
-			isEnabled = true
-			frontFace = bothFaces
-			backFace = bothFaces
-		}
-
-		def new(frontFace StencilFaceState, backFace StencilFaceState) {
-			isEnabled = true
-			self.frontFace = frontFace
-			self.backFace = backFace
-		}
-
-		def equals(other StencilState) bool {
-			return
-				self == other ||
-				isEnabled == other.isEnabled &&
-				frontFace.equals(other.frontFace) &&
-				backFace.equals(other.backFace)
-		}
-	}
-
-	namespace StencilState {
-		const NONE = new
-	}
-
 	interface Context {
 		def addContextResetHandler(callback fn())
 		def beginFrame
-		def clear(mode Clear) { clear(mode, .TRANSPARENT) }
-		def clear(mode Clear, color Color)
+		def clear(color Color)
 		def createMaterial(format VertexFormat, vertexSource string, fragmentSource string) Material
 		def createTexture(format TextureFormat, width int, height int) Texture { return createTexture(format, width, height, null) }
 		def createTexture(format TextureFormat, width int, height int, pixels Uint8Array) Texture
-		def createTextureSet(color Texture, stencil Texture) TextureSet
+		def createTextureSet(color Texture) TextureSet
 		def createVertexBuffer(byteCount int) VertexBuffer
 		def currentTextureSet TextureSet
 		def draw(primitive Primitive, material Material, area BufferArea)
@@ -128,7 +37,6 @@ namespace GPU {
 		def height int
 		def removeContextResetHandler(callback fn())
 		def resize(width int, height int)
-		def setStencilState(state StencilState)
 		def setTextureSet(textureSet TextureSet)
 		def setViewport(x int, y int, width int, height int)
 		def width int
@@ -136,6 +44,7 @@ namespace GPU {
 		def setBlendState(sourceColor BlendOperation, targetColor BlendOperation, sourceAlpha BlendOperation, targetAlpha BlendOperation, constant double)
 		def setCopyBlendState { setBlendState(.ONE, .ZERO, .ONE, .ZERO) }
 		def setKeepBlendState { setBlendState(.ZERO, .ONE, .ZERO, .ONE) }
+		def setAddBlendState { setBlendState(.ONE, .ONE, .ONE, .ONE) }
 		def setInterpolateBlendState(t double) { setBlendState(.CONSTANT, .INVERSE_CONSTANT, .CONSTANT, .INVERSE_CONSTANT, t) }
 		def setPremultipliedBlendState { setBlendState(.ONE, .INVERSE_SOURCE_ALPHA, .ONE, .INVERSE_SOURCE_ALPHA) }
 		def setUnpremultipliedBlendState { setBlendState(.SOURCE_ALPHA, .INVERSE_SOURCE_ALPHA, .SOURCE_ALPHA, .INVERSE_SOURCE_ALPHA) }
@@ -206,11 +115,6 @@ namespace GPU {
 
 	enum PixelFormat {
 		RGBA_32
-		DEPTH_24_STENCIL_8
-
-		def byteLength int {
-			return 4
-		}
 	}
 
 	enum PixelFilter {
@@ -234,7 +138,6 @@ namespace GPU {
 		const RGBA_LINEAR_CLAMP = new(.RGBA_32, .LINEAR, .LINEAR, .CLAMP)
 		const RGBA_LINEAR_MIN_NEAREST_MAG_CLAMP = new(.RGBA_32, .LINEAR, .NEAREST, .CLAMP)
 		const RGBA_NEAREST_CLAMP = new(.RGBA_32, .NEAREST, .NEAREST, .CLAMP)
-		const DEPTH_STENCIL = new(.DEPTH_24_STENCIL_8, .NEAREST, .NEAREST, .CLAMP)
 	}
 
 	interface Texture {
@@ -249,8 +152,6 @@ namespace GPU {
 	interface TextureSet {
 		def context Context
 		def colorTexture Texture
-		def depthStencilTexture Texture
 		def setColor(texture Texture)
-		def setDepthStencil(texture Texture)
 	}
 }

@@ -59,9 +59,11 @@ class App {
 	}
 
 	def _draw {
-		_canvas.clear
+		_canvas.beginFrame
 		_canvas.drawGrid(_origin, _scale)
+		_canvas.drawSmoothGeometry
 		_canvas.drawFunction(_origin, _scale)
+		_canvas.drawText(_origin, _scale)
 	}
 }
 

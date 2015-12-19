@@ -41,6 +41,11 @@ class Transform {
 			m12 == t.m12
 	}
 
+	def reset {
+		m00 = m11 = 1
+		m01 = m02 = m10 = m12 = 0
+	}
+
 	def translate(v Vector) {
 		translate(v.x, v.y)
 	}
@@ -127,24 +132,22 @@ class Transform {
 		direction.y = y
 	}
 
-	def set(m00 double, m01 double, m02 double, m10 double, m11 double, m12 double) Transform {
+	def set(m00 double, m01 double, m02 double, m10 double, m11 double, m12 double) {
 		self.m00 = m00
 		self.m01 = m01
 		self.m02 = m02
 		self.m10 = m10
 		self.m11 = m11
 		self.m12 = m12
-		return self
 	}
 
-	def set(t Transform) Transform {
+	def set(t Transform) {
 		m00 = t.m00
 		m01 = t.m01
 		m02 = t.m02
 		m10 = t.m10
 		m11 = t.m11
 		m12 = t.m12
-		return self
 	}
 
 	def toString string {
