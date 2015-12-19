@@ -1,5 +1,5 @@
 class App {
-	var _canvas = Canvas.new
+	var _canvas Canvas
 	var _fps = 60.0
 	var _isInvalid = true
 	var _validFrames = 0
@@ -7,7 +7,8 @@ class App {
 	var _origin = Vector.new(window.innerWidth / 2, window.innerHeight / 2)
 	var _scale = 100.0
 
-	def new {
+	def new(fontData DataArray) {
+		_canvas = Canvas.new(fontData)
 		_addEventHandlers
 		_startRenderLoop
 	}
@@ -67,6 +68,12 @@ class App {
 namespace App {
 	@entry
 	def main {
-		new
+		var xhr = XMLHttpRequest.new
+		xhr.open("GET", "fonts.bin")
+		xhr.onload = => {
+			new(DataArray.new(Uint8Array.new(xhr.response)))
+		}
+		xhr.responseType = "arraybuffer"
+		xhr.send
 	}
 }

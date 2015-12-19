@@ -34,10 +34,14 @@ if TARGET == .JAVASCRIPT {
 			def new {
 				_gl = document.createElementCanvas.getContextWebGL({
 					"alpha": false,
-					"antialias": false,
 					"depth": false,
 					"preserveDrawingBuffer": false,
-					"stencil": false,
+
+					# "antialias": false,
+					# "stencil": false,
+
+					"antialias": true,
+					"stencil": true,
 				})
 
 				if _gl == null {

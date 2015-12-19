@@ -1,8 +1,17 @@
 class DataArray {
-	var _bytes = Uint8Array.new(INITIAL_CAPACITY)
+	var _bytes Uint8Array
 	var _count = 0
 	var _readOffset = 0
 	var _capacity = INITIAL_CAPACITY
+
+	def new {
+		_bytes = Uint8Array.new(INITIAL_CAPACITY)
+	}
+
+	def new(bytes Uint8Array) {
+		_bytes = bytes
+		_count = _capacity = bytes.length
+	}
 
 	def clear {
 		_count = 0
@@ -28,14 +37,16 @@ class DataArray {
 	def _grow {
 		_capacity *= 2
 		var bytes = Uint8Array.new(_capacity)
-		if _bytes != null {
-			bytes.set(_bytes)
-		}
+		bytes.set(_bytes)
 		_bytes = bytes
 	}
 
 	def hasMoreToRead bool {
 		return _readOffset < _count
+	}
+
+	def seekTo(count int) {
+		_readOffset = count
 	}
 
 	def skipBytes(count int) {

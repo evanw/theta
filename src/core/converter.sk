@@ -1,17 +1,17 @@
 namespace Converter {
+	var _bytes Uint8Array
 	var _float Float32Array
 	var _int Int32Array
-	var _bytes Uint8Array
 	var _isReady = false
 
 	def setup {
 		if _isReady {
 			return
 		}
+		_bytes = Uint8Array.new(4)
+		_float = Float32Array.new(_bytes.buffer)
+		_int = Int32Array.new(_bytes.buffer)
 		_isReady = true
-		_float = Float32Array.new(1)
-		_int = Int32Array.new(_float.buffer)
-		_bytes = Uint8Array.new(_float.buffer)
 	}
 
 	def floatToInt(value double) int {

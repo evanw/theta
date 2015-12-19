@@ -1,0 +1,133 @@
+enum Command {
+	MOVE_TO
+	LINE_TO
+	CURVE_TO
+	CLOSE
+}
+
+enum TriangleKind {
+	SOLID
+	QUADRATIC_CURVE
+}
+
+class Font {
+	var data DataArray
+	var ascender = 0.0
+	var descender = 0.0
+	var _glyphs IntMap<Glyph> = {}
+
+	def new(data DataArray) {
+		self.data = data
+		ascender = data.readFloat
+		descender = data.readFloat
+
+		for i in 0..data.readInt {
+			var glyph = Glyph.new
+			glyph.codePoint = data.readInt
+			glyph.advanceWidth = data.readFloat
+			glyph.byteOffset = data.readInt
+			glyph.byteLength = data.readInt
+			_glyphs[glyph.codePoint] = glyph
+		}
+	}
+
+	def glyph(codePoint int) Glyph {
+		var glyph = _glyphs.get(codePoint, null)
+
+		if glyph != null && glyph.vertices.isEmpty {
+			var end = glyph.byteOffset + glyph.byteLength
+			var firstX = 0.0
+			var firstY = 0.0
+			var currentX = 0.0
+			var currentY = 0.0
+			var contourCount = 0
+
+			data.seekTo(glyph.byteOffset)
+
+			while data.readOffset < end {
+				switch data.readByte as Command {
+					case .MOVE_TO {
+						firstX = currentX = data.readFloat
+						firstY = currentY = data.readFloat
+						contourCount = 0
+					}
+
+					case .LINE_TO {
+						var x = data.readFloat
+						var y = data.readFloat
+
+						if ++contourCount >= 2 {
+							glyph.appendTriangle(firstX, firstY, currentX, currentY, x, y, .SOLID)
+						}
+
+						currentX = x
+						currentY = y
+					}
+
+					case .CURVE_TO {
+						var x1 = data.readFloat
+						var y1 = data.readFloat
+						var x = data.readFloat
+						var y = data.readFloat
+
+						if ++contourCount >= 2 {
+							glyph.appendTriangle(firstX, firstY, currentX, currentY, x, y, .SOLID)
+						}
+
+						glyph.appendTriangle(currentX, currentY, x1, y1, x, y, .QUADRATIC_CURVE)
+						currentX = x
+						currentY = y
+					}
+
+					case .CLOSE {
+						currentX = firstX
+						currentY = firstY
+						contourCount = 0
+					}
+
+					default {
+						assert(false)
+					}
+				}
+			}
+		}
+
+		return glyph
+	}
+}
+
+class Glyph {
+	var codePoint = 0
+	var advanceWidth = 0.0
+	var byteOffset = 0
+	var byteLength = 0
+	var minX = Math.INFINITY
+	var minY = Math.INFINITY
+	var maxX = -Math.INFINITY
+	var maxY = -Math.INFINITY
+	var vertices = DataArray.new
+
+	def appendTriangle(ax double, ay double, bx double, by double, cx double, cy double, kind TriangleKind) {
+		switch kind {
+			case .SOLID {
+				appendVertex(ax, ay, 0, 1)
+				appendVertex(bx, by, 0, 1)
+				appendVertex(cx, cy, 0, 1)
+			}
+
+			case .QUADRATIC_CURVE {
+				appendVertex(ax, ay, 0, 0)
+				appendVertex(bx, by, 0.5, 0)
+				appendVertex(cx, cy, 1, 1)
+			}
+		}
+	}
+
+	def appendVertex(x double, y double, s double, t double) {
+		minX = Math.min(minX, x)
+		minY = Math.min(minY, y)
+		maxX = Math.max(maxX, x)
+		maxY = Math.max(maxY, y)
+		vertices.appendFloat(x).appendFloat(y).appendFloat(s).appendFloat(t)
+	}
+}

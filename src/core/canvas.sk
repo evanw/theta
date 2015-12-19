@@ -1,10 +1,15 @@
 class Canvas {
-	var _format = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
+	var _font Font
+	var _quadFormat = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
+	var _stencilFormat = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION4, .FLOAT, 4)
 	var _context GPU.Context
 	var _pool GPU.BufferPool
 	var _smooth GPU.SmoothRenderer
-	var _material GPU.Material
+	var _demoMaterial GPU.Material
+	var _stencilMaterial GPU.Material
+	var _coverMaterial GPU.Material
 	var _quad GPU.BufferArea
+	var _glyph GPU.BufferArea
 
 	# Viewport size
 	var _width = 0
@@ -16,14 +21,18 @@ class Canvas {
 	var onPinch fn(double, double, double) = null
 	var onResize fn() = null
 
-	def new {
+	def new(fontData DataArray) {
+		_font = Font.new(fontData)
 		_context = GPU.HTMLContext.new
 		_pool = GPU.BufferPool.new(_context)
 		_smooth = GPU.SmoothRenderer.new(_context, _pool)
 		(_context as GPU.HTMLContext).gl.getExtension("OES_standard_derivatives")
-		_material = _context.createMaterial(_format, GLSLX_SOURCE_DEMO_VERTEX, GLSLX_SOURCE_DEMO_FRAGMENT)
+		_demoMaterial = _context.createMaterial(_quadFormat, GLSLX_SOURCE_DEMO_VERTEX, GLSLX_SOURCE_DEMO_FRAGMENT)
+		_stencilMaterial = _context.createMaterial(_stencilFormat, GLSLX_SOURCE_STENCIL_VERTEX, GLSLX_SOURCE_STENCIL_FRAGMENT)
+		_coverMaterial = _context.createMaterial(_quadFormat, GLSLX_SOURCE_COVER_VERTEX, GLSLX_SOURCE_COVER_FRAGMENT)
 		_attachToDOM(_context as GPU.HTMLContext)
-		_quad = _pool.allocate(_format, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
+		_quad = _pool.allocate(_quadFormat, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
+		_glyph = _pool.allocate(_stencilFormat, _font.glyph('β').vertices.bytes)
 	}
 
 	def _attachToDOM(context GPU.HTMLContext) {
@@ -42,7 +51,7 @@ class Canvas {
 
 			var transform = Transform.new
 			transform.translate(-1, 1)
-			transform.scale(2.0 / width, -2.0 / height)
+			transform.scale(2.0 / _width, -2.0 / _height)
 			_smooth.setTransformAndPixelScale(transform, _density)
 
 			if onResize != null {
@@ -98,13 +107,34 @@ class Canvas {
 	}
 
 	def drawFunction(origin Vector, scale double) {
-		_material.setUniformVec4(GLSLX_NAME_VALUE4, origin.x, origin.y, scale, _height)
+		_demoMaterial.setUniformVec4(GLSLX_NAME_VALUE4, origin.x, origin.y, scale, _height)
 		_context.setPremultipliedBlendState
-		_context.draw(.TRIANGLE_STRIP, _material, _quad)
+		_context.draw(.TRIANGLE_STRIP, _demoMaterial, _quad)
+
+		var transform = Transform.new
+		transform.translate(-1, 1)
+		transform.scale(2.0 / _width, -2.0 / _height)
+		transform.translate(origin)
+		transform.scale(scale)
+
+		_context.setKeepBlendState
+		_context.setStencilState(XOR_STATE)
+		_stencilMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, transform)
+		_context.draw(.TRIANGLES, _stencilMaterial, _glyph)
+
+		_context.setPremultipliedBlendState
+		_context.setStencilState(NONZERO_STATE)
+		_coverMaterial.setUniformVec4(GLSLX_NAME_VALUE4, 0, 0, 0, 1)
+		_coverMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, transform)
+		_context.draw(.TRIANGLE_STRIP, _coverMaterial, _quad)
+
+		_context.setStencilState(.NONE)
 	}
 }
 
 namespace Canvas {
 	const GRID_LIGHT = Color.new(0, 0, 0, 31)
 	const GRID_DARK = Color.new(0, 0, 0, 127)
+	const XOR_STATE = GPU.StencilState.new(GPU.StencilFaceState.new(0, .ALWAYS, 1, 1, .INVERT, .INVERT, .INVERT))
+	const NONZERO_STATE = GPU.StencilState.new(GPU.StencilFaceState.new(0, .NOT_EQUAL, 1, 1, .ZERO, .ZERO, .ZERO))
 }
