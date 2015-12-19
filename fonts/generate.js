@@ -23,6 +23,9 @@ function floatToBytes(float, bytes) {
 }
 
 function shortToBytes(short, bytes) {
+	if (short < -0x8000 || short > 0x7FFF) {
+		throw new Error('Cannot store ' + short + ' as a short');
+	}
 	shortArray[0] = short;
 	bytes.push(
 		byteArray[0],
@@ -38,7 +41,7 @@ function intToBytes(int, bytes) {
 		byteArray[3]);
 }
 
-function compilePathCommands(commands) {
+function compilePathCommands(commands, units) {
 	var bytes = [];
 
 	for (var i = 0; i < commands.length; i++) {
@@ -46,24 +49,24 @@ function compilePathCommands(commands) {
 		switch (command.type) {
 			case 'M': {
 				bytes.push(Command.MOVE_TO);
-				floatToBytes(command.x, bytes);
-				floatToBytes(command.y, bytes);
+				shortToBytes(Math.round(command.x * units), bytes);
+				shortToBytes(Math.round(command.y * units), bytes);
 				break;
 			}
 
 			case 'L': {
 				bytes.push(Command.LINE_TO);
-				floatToBytes(command.x, bytes);
-				floatToBytes(command.y, bytes);
+				shortToBytes(Math.round(command.x * units), bytes);
+				shortToBytes(Math.round(command.y * units), bytes);
 				break;
 			}
 
 			case 'Q': {
 				bytes.push(Command.CURVE_TO);
-				floatToBytes(command.x1, bytes);
-				floatToBytes(command.y1, bytes);
-				floatToBytes(command.x, bytes);
-				floatToBytes(command.y, bytes);
+				shortToBytes(Math.round(command.x1 * units), bytes);
+				shortToBytes(Math.round(command.y1 * units), bytes);
+				shortToBytes(Math.round(command.x * units), bytes);
+				shortToBytes(Math.round(command.y * units), bytes);
 				break;
 			}
 
@@ -85,11 +88,12 @@ function process(options) {
 	var glyphs = [];
 	var ascender = 0;
 	var descender = 0;
+	var units = options.unitsPerEm;
 
 	options.inputs.forEach(function(input) {
 		var font = opentype.loadSync(input.path);
-		ascender += font.ascender / font.unitsPerEm;
-		descender += font.descender / font.unitsPerEm;
+		ascender += font.ascender / font.unitsPerEm * units;
+		descender += font.descender / font.unitsPerEm * units;
 		for (var i = 0; i < input.chars.length; i++) {
 			var char = input.chars[i];
 			var glyph = font.charToGlyph(char);
@@ -107,18 +111,22 @@ function process(options) {
 	});
 
 	var bytes = [];
-	var pathOffset = 12 + 16 * glyphs.length;
+	var pathOffset = 8 + 10 * glyphs.length;
 
-	floatToBytes(ascender / options.inputs.length, bytes);
-	floatToBytes(descender / options.inputs.length, bytes);
-	intToBytes(glyphs.length, bytes);
+	ascender = Math.round(ascender / options.inputs.length);
+	descender = Math.round(descender / options.inputs.length);
+
+	shortToBytes(units, bytes);
+	shortToBytes(ascender, bytes);
+	shortToBytes(descender, bytes);
+	shortToBytes(glyphs.length, bytes);
 
 	for (var i = 0; i < glyphs.length; i++) {
 		var glyph = glyphs[i];
-		intToBytes(glyph.codePoint, bytes);
-		floatToBytes(glyph.advanceWidth, bytes);
+		shortToBytes(glyph.codePoint, bytes);
+		shortToBytes(Math.round(glyph.advanceWidth * units), bytes);
 		intToBytes(pathOffset, bytes);
-		intToBytes(glyph.path.length, bytes);
+		shortToBytes(glyph.path.length, bytes);
 		pathOffset += glyph.path.length;
 	}
 
@@ -133,6 +141,7 @@ function process(options) {
 
 function main() {
 	process({
+		unitsPerEm: 1000,
 		inputs: [
 			{
 				path: __dirname + '/FreeSerifItalic.ttf',

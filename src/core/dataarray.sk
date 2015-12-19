@@ -96,6 +96,34 @@ class DataArray {
 }
 
 ################################################################################
+# Short
+
+class DataArray {
+	def shortAt(index int) int {
+		assert(index >= 0 && index + 2 <= _count)
+		return Converter.bytesToShort(_bytes[index], _bytes[index + 1])
+	}
+
+	def appendShort(value int) DataArray {
+		appendBytes(Converter.shortToBytes(value))
+		return self
+	}
+
+	def appendShorts(values List<int>) DataArray {
+		for value in values {
+			appendShort(value)
+		}
+		return self
+	}
+
+	def readShort int {
+		var value = shortAt(_readOffset)
+		_readOffset += 2
+		return value
+	}
+}
+
+################################################################################
 # Int
 
 class DataArray {

@@ -14,19 +14,21 @@ class Font {
 	var data DataArray
 	var ascender = 0.0
 	var descender = 0.0
+	var _scale = 0.0
 	var _glyphs IntMap<Glyph> = {}
 
 	def new(data DataArray) {
 		self.data = data
-		ascender = data.readFloat
-		descender = data.readFloat
+		_scale = 1.0 / data.readShort
+		ascender = data.readShort * _scale
+		descender = data.readShort * _scale
 
-		for i in 0..data.readInt {
+		for i in 0..data.readShort {
 			var glyph = Glyph.new
-			glyph.codePoint = data.readInt
-			glyph.advanceWidth = data.readFloat
+			glyph.codePoint = data.readShort
+			glyph.advanceWidth = data.readShort * _scale
 			glyph.byteOffset = data.readInt
-			glyph.byteLength = data.readInt
+			glyph.byteLength = data.readShort
 			_glyphs[glyph.codePoint] = glyph
 		}
 	}
@@ -36,6 +38,7 @@ class Font {
 
 		if glyph != null && glyph.vertices.isEmpty {
 			var end = glyph.byteOffset + glyph.byteLength
+			var scale = _scale
 			var firstX = 0.0
 			var firstY = 0.0
 			var currentX = 0.0
@@ -47,14 +50,14 @@ class Font {
 			while data.readOffset < end {
 				switch data.readByte as Command {
 					case .MOVE_TO {
-						firstX = currentX = data.readFloat
-						firstY = currentY = data.readFloat
+						firstX = currentX = data.readShort * scale
+						firstY = currentY = data.readShort * scale
 						contourCount = 0
 					}
 
 					case .LINE_TO {
-						var x = data.readFloat
-						var y = data.readFloat
+						var x = data.readShort * scale
+						var y = data.readShort * scale
 
 						if ++contourCount >= 2 {
 							glyph.appendTriangle(firstX, firstY, currentX, currentY, x, y, .SOLID)
@@ -65,10 +68,10 @@ class Font {
 					}
 
 					case .CURVE_TO {
-						var x1 = data.readFloat
-						var y1 = data.readFloat
-						var x = data.readFloat
-						var y = data.readFloat
+						var x1 = data.readShort * scale
+						var y1 = data.readShort * scale
+						var x = data.readShort * scale
+						var y = data.readShort * scale
 
 						if ++contourCount >= 2 {
 							glyph.appendTriangle(firstX, firstY, currentX, currentY, x, y, .SOLID)

@@ -8,8 +8,12 @@ class Canvas {
 	var _demoMaterial GPU.Material
 	var _stencilMaterial GPU.Material
 	var _coverMaterial GPU.Material
+	var _copyMaterial GPU.Material
 	var _quad GPU.BufferArea
 	var _glyph GPU.BufferArea
+	var _color GPU.Texture
+	var _depth GPU.Texture
+	var _target GPU.TextureSet
 
 	# Viewport size
 	var _width = 0
@@ -30,9 +34,13 @@ class Canvas {
 		_demoMaterial = _context.createMaterial(_quadFormat, GLSLX_SOURCE_DEMO_VERTEX, GLSLX_SOURCE_DEMO_FRAGMENT)
 		_stencilMaterial = _context.createMaterial(_stencilFormat, GLSLX_SOURCE_STENCIL_VERTEX, GLSLX_SOURCE_STENCIL_FRAGMENT)
 		_coverMaterial = _context.createMaterial(_quadFormat, GLSLX_SOURCE_COVER_VERTEX, GLSLX_SOURCE_COVER_FRAGMENT)
-		_attachToDOM(_context as GPU.HTMLContext)
+		_copyMaterial = _context.createMaterial(_quadFormat, GLSLX_SOURCE_COPY_VERTEX, GLSLX_SOURCE_COPY_FRAGMENT)
 		_quad = _pool.allocate(_quadFormat, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
 		_glyph = _pool.allocate(_stencilFormat, _font.glyph('β').vertices.bytes)
+		_color = _context.createTexture(.RGBA_NEAREST_CLAMP, 0, 0)
+		_depth = _context.createTexture(.DEPTH_STENCIL, 0, 0)
+		_target = _context.createTextureSet(_color, _depth)
+		_attachToDOM(_context as GPU.HTMLContext)
 	}
 
 	def _attachToDOM(context GPU.HTMLContext) {
@@ -48,6 +56,8 @@ class Canvas {
 			var height = Math.round(_height * _density) as int
 
 			context.resize(width, height)
+			_color.resize(width, height, null)
+			_depth.resize(width, height, null)
 
 			var transform = Transform.new
 			transform.translate(-1, 1)
@@ -81,11 +91,12 @@ class Canvas {
 	}
 
 	def clear {
+		_context.setCopyBlendState
 		_context.clear(.ALL, .WHITE)
 	}
 
 	def drawGrid(origin Vector, scale double) {
-		var log = Math.log(scale / 100) / Math.log(10)
+		var log = Math.log(scale / 64) / Math.log(10)
 		var step = Math.pow(10, Math.round(log))
 		var ratio = step / scale
 		var left = Math.ceil(-origin.x * ratio) as int
@@ -103,6 +114,7 @@ class Canvas {
 			_smooth.strokeLine(0, ty, _width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK : GRID_LIGHT, y == 0 ? 2 : 1)
 		}
 
+		_context.setPremultipliedBlendState
 		_smooth.flush
 	}
 
@@ -117,6 +129,9 @@ class Canvas {
 		transform.translate(origin)
 		transform.scale(scale)
 
+		# _context.setTextureSet(_target)
+		# _context.clear(.ALL, .TRANSPARENT)
+
 		_context.setKeepBlendState
 		_context.setStencilState(XOR_STATE)
 		_stencilMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, transform)
@@ -125,10 +140,14 @@ class Canvas {
 		_context.setPremultipliedBlendState
 		_context.setStencilState(NONZERO_STATE)
 		_coverMaterial.setUniformVec4(GLSLX_NAME_VALUE4, 0, 0, 0, 1)
-		_coverMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, transform)
 		_context.draw(.TRIANGLE_STRIP, _coverMaterial, _quad)
 
 		_context.setStencilState(.NONE)
+		_context.setTextureSet(null)
+
+		# _context.setPremultipliedBlendState
+		# _copyMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
+		# _context.draw(.TRIANGLE_STRIP, _copyMaterial, _quad)
 	}
 }
 

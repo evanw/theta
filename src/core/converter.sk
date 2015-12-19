@@ -1,16 +1,25 @@
 namespace Converter {
-	var _bytes Uint8Array
+	var _bytes4 Uint8Array
 	var _float Float32Array
 	var _int Int32Array
+
+	var _bytes2 Uint8Array
+	var _short Int16Array
+
 	var _isReady = false
 
 	def setup {
 		if _isReady {
 			return
 		}
-		_bytes = Uint8Array.new(4)
-		_float = Float32Array.new(_bytes.buffer)
-		_int = Int32Array.new(_bytes.buffer)
+
+		_bytes4 = Uint8Array.new(4)
+		_float = Float32Array.new(_bytes4.buffer)
+		_int = Int32Array.new(_bytes4.buffer)
+
+		_bytes2 = Uint8Array.new(2)
+		_short = Int16Array.new(_bytes2.buffer)
+
 		_isReady = true
 	}
 
@@ -29,30 +38,43 @@ namespace Converter {
 	def floatToBytes(value double) Uint8Array {
 		setup
 		_float[0] = value
-		return _bytes
+		return _bytes4
 	}
 
 	def bytesToFloat(a int, b int, c int, d int) double {
 		setup
-		_bytes[0] = a
-		_bytes[1] = b
-		_bytes[2] = c
-		_bytes[3] = d
+		_bytes4[0] = a
+		_bytes4[1] = b
+		_bytes4[2] = c
+		_bytes4[3] = d
 		return _float[0]
 	}
 
 	def intToBytes(value int) Uint8Array {
 		setup
 		_int[0] = value
-		return _bytes
+		return _bytes4
 	}
 
 	def bytesToInt(a int, b int, c int, d int) int {
 		setup
-		_bytes[0] = a
-		_bytes[1] = b
-		_bytes[2] = c
-		_bytes[3] = d
+		_bytes4[0] = a
+		_bytes4[1] = b
+		_bytes4[2] = c
+		_bytes4[3] = d
 		return _int[0]
+	}
+
+	def shortToBytes(value int) Uint8Array {
+		setup
+		_short[0] = value
+		return _bytes2
+	}
+
+	def bytesToShort(a int, b int) int {
+		setup
+		_bytes2[0] = a
+		_bytes2[1] = b
+		return _short[0]
 	}
 }
