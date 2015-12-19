@@ -76,19 +76,22 @@ class Canvas {
 	}
 
 	def drawGrid(origin Vector, scale double) {
-		var left = Math.ceil(-origin.x / scale) as int
-		var top = Math.ceil(-origin.y / scale) as int
-		var right = Math.ceil((_width - origin.x) / scale) as int
-		var bottom = Math.ceil((_height - origin.y) / scale) as int
+		var log = Math.log(scale / 100) / Math.log(10)
+		var step = Math.pow(10, Math.round(log))
+		var ratio = step / scale
+		var left = Math.ceil(-origin.x * ratio) as int
+		var top = Math.ceil(-origin.y * ratio) as int
+		var right = Math.ceil((_width - origin.x) * ratio) as int
+		var bottom = Math.ceil((_height - origin.y) * ratio) as int
 
 		for x in left..right {
-			var tx = origin.x + x * scale
-			_smooth.strokeLine(tx, 0, tx, _height, x == 0 ? .BLACK : Color.new(0, 0, 0, 31), 1)
+			var tx = origin.x + x * scale / step
+			_smooth.strokeLine(tx, 0, tx, _height, x == 0 ? .BLACK : x % 10 == 0 ? GRID_DARK : GRID_LIGHT, x == 0 ? 2 : 1)
 		}
 
 		for y in top..bottom {
-			var ty = origin.y + y * scale
-			_smooth.strokeLine(0, ty, _width, ty, y == 0 ? .BLACK : Color.new(0, 0, 0, 31), 1)
+			var ty = origin.y + y * scale / step
+			_smooth.strokeLine(0, ty, _width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK : GRID_LIGHT, y == 0 ? 2 : 1)
 		}
 
 		_smooth.flush
@@ -99,4 +102,9 @@ class Canvas {
 		_context.setPremultipliedBlendState
 		_context.draw(.TRIANGLE_STRIP, _material, _quad)
 	}
+}
+
+namespace Canvas {
+	const GRID_LIGHT = Color.new(0, 0, 0, 31)
+	const GRID_DARK = Color.new(0, 0, 0, 127)
 }

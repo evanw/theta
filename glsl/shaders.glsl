@@ -30,15 +30,25 @@ export void demoFragment() {
 	float y = (value4.w - pixel.y - value4.y) / value4.z;
 
 	// float z = cos(x - sin(y)) - cos(y + sin(x));
+	float z = y - (x * x * x - x);
+
+	/*
 	float z = 0.0;
-	for (int i = 1; i < 10; i++)
+	for (int i = 1; i < 4; i++)
 		z +=
 			cos(x * 4.0 / float(i)) +
 			sin(y * 4.0 / float(i)) +
 			sin(sqrt(x * x + y * y) * 4.0 / float(i));
+	*/
 
-	float edge = clamp(1.0 - abs(z) / fwidth(z), 0.0, 1.0);
-	float area = clamp(0.5 + z / fwidth(z), 0.0, 1.0);
-	float alpha = mix(edge, 1.0, area * 0.25);
+	float slopeX = dFdx(z);
+	float slopeY = dFdy(z);
+	float slope = sqrt(slopeX * slopeX + slopeY * slopeY);
+	float edge = clamp(2.0 - abs(z) / slope, 0.0, 1.0);
+	float area = clamp(0.5 + z / slope, 0.0, 1.0);
+
+	// float alpha = mix(edge, 1.0, area * 0.25);
+	float alpha = edge;
+
 	gl_FragColor = vec4(0.0, 0.5, 1.0, 1.0) * alpha;
 }

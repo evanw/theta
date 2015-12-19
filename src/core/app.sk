@@ -59,8 +59,8 @@ class App {
 
 	def _draw {
 		_canvas.clear
-		_canvas.drawFunction(_origin, _scale)
 		_canvas.drawGrid(_origin, _scale)
+		_canvas.drawFunction(_origin, _scale)
 	}
 }
 
