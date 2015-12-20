@@ -92,7 +92,8 @@ export void demoFragment() {
 	// float z = sin(theta * 7.0) - sin(r);
 	// float z = sin(r + theta);
 	// float z = y - gamma(x + 1.0);
-	float z = 4.0 * abs(sin(4.0 * theta)) - r;
+	// float z = 4.0 * sin(6.0 * (theta + sin(4.0 * r) * 0.1)) - r;
+	float z = x + y;
 
 	/*
 	float z = 0.0;

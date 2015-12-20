@@ -33,10 +33,65 @@ namespace Layout {
 
 	################################################################################
 
+	class Anchor {
+		var container Container = null
+		var indexInContainer = 0
+
+		def render(renderer Renderer) {
+			var x = container.box.x
+			for i in 0..indexInContainer {
+				x += container.children[i].box.width
+			}
+			renderer.addLine(x, container.box.y, x, container.box.y + container.box.height)
+		}
+
+		def loadFrom(rootContainer Container, rootIndex int) {
+			assert(0 <= rootIndex && rootIndex < rootContainer.anchorCount)
+			var count = rootContainer.children.count
+
+			# Search the children for the anchor
+			for i in 0..count {
+				var child = rootContainer.children[i]
+
+				# Check before this child
+				if rootIndex == 0 {
+					container = rootContainer
+					indexInContainer = i
+					return
+				}
+				rootIndex--
+
+				# Check inside this child
+				if rootIndex < child.anchorCount {
+					if child is Fraction {
+						var fraction = child as Fraction
+						if rootIndex < fraction.top.anchorCount {
+							loadFrom(fraction.top, rootIndex)
+						} else {
+							loadFrom(fraction.bottom, rootIndex - fraction.top.anchorCount)
+						}
+						return
+					} else {
+						assert(false)
+					}
+				}
+				rootIndex -= child.anchorCount
+			}
+
+			# Must be after the last child
+			assert(rootIndex == 0)
+			container = rootContainer
+			indexInContainer = count
+		}
+	}
+
+	################################################################################
+
 	class Element {
 		var box = Box.new
 		var anchorCount = 0
 
+		def clone Element
 		def updateAnchorCount
 		def calculateSize(renderer Renderer, fontSize double)
 		def updateLayout(x double, y double)
@@ -48,6 +103,10 @@ namespace Layout {
 	class Character : Element {
 		var codePoint int
 		var paddingLeft = 0.0
+
+		over clone Element {
+			return new(codePoint)
+		}
 
 		over updateAnchorCount {
 			anchorCount = 0
@@ -80,6 +139,14 @@ namespace Layout {
 
 	class Container : Element {
 		var children List<Element> = []
+
+		over clone Element {
+			var clone = new
+			for child in children {
+				clone.children.append(child.clone)
+			}
+			return clone
+		}
 
 		over updateAnchorCount {
 			anchorCount = children.count + 1
@@ -134,6 +201,13 @@ namespace Layout {
 		var top = Container.new
 		var bottom = Container.new
 
+		over clone Element {
+			var clone = new
+			clone.top = top.clone as Container
+			clone.bottom = bottom.clone as Container
+			return clone
+		}
+
 		over updateAnchorCount {
 			top.updateAnchorCount
 			bottom.updateAnchorCount
@@ -160,5 +234,51 @@ namespace Layout {
 			bottom.render(renderer)
 			renderer.addLine(box.x + 2, box.y + box.upperHeight + 4, box.x + box.width - 2, box.y + box.upperHeight + 4)
 		}
+	}
+
+	################################################################################
+
+	class Editor {
+		const _renderer Renderer
+		const _originX int
+		const _originY int
+		const _container = Container.new
+		const _anchor = Anchor.new
+		var _cursorIndex = 0
+
+		def new(renderer Renderer, originX int, originY int) {
+			_renderer = renderer
+			_originX = originX
+			_originY = originY
+			_updateAfterChange
+		}
+
+		def render(showCursor bool) {
+			_container.render(_renderer)
+
+			if showCursor {
+				_anchor.loadFrom(_container, _cursorIndex)
+				_anchor.render(_renderer)
+			}
+		}
+
+		def insert(container Container) {
+			var clone = container.clone as Container
+			clone.updateAnchorCount
+			_anchor.loadFrom(_container, _cursorIndex)
+			_anchor.container.children.insert(_anchor.indexInContainer, clone.children)
+			_cursorIndex += clone.anchorCount
+			_updateAfterChange
+		}
+
+		def _updateAfterChange {
+			_container.calculateSize(_renderer, BASE_FONT_SIZE)
+			_container.updateLayout(_originX, _originY)
+			_container.updateAnchorCount
+		}
+	}
+
+	namespace Editor {
+		const BASE_FONT_SIZE = 28
 	}
 }

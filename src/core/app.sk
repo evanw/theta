@@ -13,9 +13,12 @@ enum App.Animation {
 
 class App {
 	var _canvas Canvas
+	var _editor Layout.Editor
 	var _fps = 60.0
 	var _isInvalid = true
 	var _validFrames = 0
+	var _cursorToggleFrameCount = 0
+	var _isCursorVisible = true
 
 	# Viewport transform
 	var _origin = Vector.new(window.innerWidth / 2, window.innerHeight / 2)
@@ -30,32 +33,17 @@ class App {
 	var _endScale = 0.0
 	var _endTime = 0.0
 
-	var _demoElement Layout.Container
-
 	def new(fontData DataArray) {
 		_canvas = Canvas.new(fontData)
+		_editor = Layout.Editor.new(_canvas, 20, 20)
 		_addEventHandlers
-		_createDemoElement
 		_startRenderLoop
-	}
 
-	def _createDemoElement {
-		_demoElement = Layout.Container.new
-
-		for codePoint in ['x', '+', '2', 'y', '−', '3', 'x', '·'] {
-			_demoElement.children.append(Layout.Character.new(codePoint))
-		}
-
-		var fraction = Layout.Fraction.new
-		for codePoint in ['4', 'y'] {
-			fraction.top.children.append(Layout.Character.new(codePoint))
-			fraction.bottom.children.append(Layout.Character.new(codePoint))
-		}
-		fraction.bottom.children.append(Layout.Character.new('+'))
-		fraction.bottom.children.append(Layout.Character.new('1'))
-		_demoElement.children.append(fraction)
-		_demoElement.children.append(Layout.Character.new('≤'))
-		_demoElement.children.append(Layout.Character.new('0'))
+		var c = Layout.Container.new
+		c.children.append(Layout.Character.new('y'))
+		c.children.append(Layout.Character.new('≤'))
+		c.children.append(Layout.Character.new('x'))
+		_editor.insert(c)
 	}
 
 	def _addEventHandlers {
@@ -161,6 +149,11 @@ class App {
 		_isInvalid = true
 	}
 
+	def _resetCursorBlink {
+		_isCursorVisible = true
+		_cursorToggleFrameCount = 0
+	}
+
 	def _startRenderLoop {
 		var tick fn() = => {
 			_tick
@@ -201,6 +194,12 @@ class App {
 			_invalidate
 		}
 
+		# Toggle the cursor periodically
+		if ++_cursorToggleFrameCount == 30 {
+			_cursorToggleFrameCount = 0
+			_isCursorVisible = !_isCursorVisible
+		}
+
 		# Always draw immediately when invalid
 		if _isInvalid {
 			_validFrames = 0
@@ -208,22 +207,21 @@ class App {
 			_draw
 		}
 
-		# Render occasionally even when valid (Chrome must render at least 10fps to avoid stutter when starting to render at 60fps again)
-		else if ++_validFrames < 5 * 60 && _validFrames % 6 == 0 {
+		# Render occasionally even when valid. Chrome must render at least 10fps to
+		# avoid stutter when starting to render at 60fps again.
+		else if _validFrames % 6 == 0 {
 			_draw
 		}
 	}
+
+	var _anchorIndex = 0
 
 	def _draw {
 		_canvas.beginFrame
 		_canvas.drawGrid(_origin, _scale)
 		_canvas.drawSmoothGeometry
 		_canvas.drawFunction(_origin, _scale)
-
-		_demoElement.calculateSize(_canvas, 28)
-		_demoElement.updateLayout(20, 20)
-		_demoElement.render(_canvas)
-
+		_editor.render(_isCursorVisible)
 		_canvas.drawText(_origin, _scale)
 		_canvas.drawSmoothGeometry
 	}
