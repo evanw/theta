@@ -21,7 +21,7 @@ class GPU.SmoothRenderer {
 	def new(context Context, pool BufferPool) {
 		_context = context
 		_pool = pool
-		_materal = context.createMaterial(_format, GLSLX_SOURCE_SMOOTH_PATH_VERTEX, GLSLX_SOURCE_SMOOTH_PATH_FRAGMENT)
+		_materal = context.createMaterial(_format, GLSLX_SOURCE_SMOOTH_VERTEX, GLSLX_SOURCE_SMOOTH_FRAGMENT)
 	}
 
 	def pixelScale double {

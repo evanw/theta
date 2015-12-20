@@ -34,13 +34,13 @@ float gamma(float z) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-export void smoothPathVertex() {
+export void smoothVertex() {
 	_coord2 = position4.zw;
 	_coord4 = coord4;
 	gl_Position = vec4(matrix3 * vec3(position4.xy, 1.0), 0.0).xywz;
 }
 
-export void smoothPathFragment() {
+export void smoothFragment() {
 	gl_FragColor = _coord4 * min(1.0, min(_coord2.x, _coord2.y));
 }
 

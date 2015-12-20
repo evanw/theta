@@ -1,11 +1,34 @@
+class App.OldTouch {
+	var x double
+	var y double
+	var distance double
+	var time double
+}
+
+enum App.Animation {
+	NONE
+	DECAY
+	EASE_IN_OUT
+}
+
 class App {
 	var _canvas Canvas
 	var _fps = 60.0
 	var _isInvalid = true
 	var _validFrames = 0
 
+	# Viewport transform
 	var _origin = Vector.new(window.innerWidth / 2, window.innerHeight / 2)
 	var _scale = 100.0
+
+	# Animation support
+	var _animation Animation = .NONE
+	var _startOrigin = Vector.new
+	var _startScale = 0.0
+	var _startTime = 0.0
+	var _endOrigin = Vector.new
+	var _endScale = 0.0
+	var _endTime = 0.0
 
 	def new(fontData DataArray) {
 		_canvas = Canvas.new(fontData)
@@ -14,40 +37,91 @@ class App {
 	}
 
 	def _addEventHandlers {
+		var oldTouches List<OldTouch> = []
+
 		_canvas.onResize = => {
+			_stopAnimation
 			_draw
 		}
 
 		_canvas.onScroll = (x, y) => {
+			_stopAnimation
 			_origin.x -= x
 			_origin.y -= y
 			_invalidate
 		}
 
 		_canvas.onPinch = (x, y, delta) => {
+			_stopAnimation
 			_adjustScaleWithPin(x, y, Math.pow(0.98, delta))
 		}
 
-		var previousX = 0.0
-		var previousY = 0.0
-		var previousDistance = 0.0
-
 		_canvas.onTouchStart = (x, y, distance) => {
-			previousX = x
-			previousY = y
-			previousDistance = distance
+			_stopAnimation
+			oldTouches.append(OldTouch.new(x, y, distance, _seconds))
 		}
 
 		_canvas.onTouchMove = (x, y, distance) => {
-			if distance != 0 && previousDistance != 0 {
-				_adjustScaleWithPin(previousX, previousY, distance / previousDistance)
+			var previous = oldTouches.last
+			if distance != 0 && previous.distance != 0 {
+				_adjustScaleWithPin(previous.x, previous.y, distance / previous.distance)
 			}
-			_origin.x += x - previousX
-			_origin.y += y - previousY
-			previousX = x
-			previousY = y
-			previousDistance = distance
+			_origin.x += x - previous.x
+			_origin.y += y - previous.y
+			oldTouches.append(OldTouch.new(x, y, distance, _seconds))
 		}
+
+		_canvas.onTouchEnd = (x, y, distance) => {
+			if distance.isNaN {
+				var count = oldTouches.count
+				var time = _seconds
+
+				# Search for an old touch that was long enough ago that the velocity should be stable
+				for i = count - 2; i >= 0; i-- {
+					var before = oldTouches[i]
+
+					if time - before.time > 0.1 {
+						var after = oldTouches[i + 1]
+						var scale = 1 / (after.time - before.time)
+						var velocity = Vector.new((after.x - before.x) * scale, (after.y - before.y) * scale)
+						var speed = velocity.length
+						var duration = Math.log(1 + speed) / 5
+						var flingDistance = speed * duration / 5 # Divide by 5 since a quintic decay function has an initial slope of 5
+
+						if speed > 50 {
+							_startAnimation(.DECAY, duration)
+							_endOrigin += velocity * (flingDistance / speed)
+						}
+					}
+				}
+
+				oldTouches = []
+			} else {
+				oldTouches.append(OldTouch.new(x, y, distance, _seconds))
+			}
+		}
+	}
+
+	def _seconds double {
+		return performance.now / 1000
+	}
+
+	def _startAnimation(animation Animation, duration double) {
+		_animation = animation
+
+		# Configure the start
+		_startOrigin.set(_origin)
+		_startScale = _scale
+		_startTime = _seconds
+
+		# Configure the end
+		_endOrigin.set(_startOrigin)
+		_endScale = _startScale
+		_endTime = _startTime + duration
+	}
+
+	def _stopAnimation {
+		_animation = .NONE
 	}
 
 	def _adjustScaleWithPin(x double, y double, ratio double) {
@@ -70,13 +144,45 @@ class App {
 	}
 
 	def _tick {
+		if _animation != .NONE {
+			var t = (_seconds - _startTime) / (_endTime - _startTime)
+
+			# Stop the animation once it's done
+			if t > 1 {
+				_origin.set(_endOrigin)
+				_scale = _endScale
+				_animation = .NONE
+			}
+
+			else {
+				# Bend the animation curve for a more pleasant animation
+				if _animation == .EASE_IN_OUT {
+					t *= t * t * (t * (t * 6 - 15) + 10)
+				} else {
+					assert(_animation == .DECAY)
+					t = 1 - t
+					t = 1 - t * t * t * t * t
+				}
+
+				# Animate both origin and scale
+				_scale = 1 / (1 / _startScale + (1 / _endScale - 1 / _startScale) * t)
+				_origin.set(_endOrigin)
+				_origin -= _startOrigin
+				_origin *= t
+				_origin += _startOrigin
+			}
+
+			_invalidate
+		}
+
+		# Always draw immediately when invalid
 		if _isInvalid {
 			_validFrames = 0
 			_isInvalid = false
 			_draw
 		}
 
-		# Chrome must render at least 10fps to avoid stutter when starting to render at 60fps again
+		# Render occasionally even when valid (Chrome must render at least 10fps to avoid stutter when starting to render at 60fps again)
 		else if ++_validFrames < 5 * 60 && _validFrames % 6 == 0 {
 			_draw
 		}
