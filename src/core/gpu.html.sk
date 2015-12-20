@@ -234,26 +234,17 @@ if TARGET == .JAVASCRIPT {
 					assert(targetAlpha in _blendOperationMap)
 					assert(constant >= 0 && constant <= 1)
 
-					# Special-case the blend mode that doesn't modify anything
-					if operations == KEEP_BLEND_OPERATIONS {
-						gl.colorMask(false, false, false, false)
+					# Special-case the blend mode that just writes over the target buffer
+					if operations == COPY_BLEND_OPERATIONS {
+						gl.disable(gl.BLEND)
 					} else {
-						if _forceStateUpdate || oldOperations == KEEP_BLEND_OPERATIONS {
-							gl.colorMask(true, true, true, true)
+						if _forceStateUpdate || oldOperations == COPY_BLEND_OPERATIONS {
+							gl.enable(gl.BLEND)
 						}
 
-						# Special-case the blend mode that just writes over the target buffer
-						if operations == COPY_BLEND_OPERATIONS {
-							gl.disable(gl.BLEND)
-						} else {
-							if _forceStateUpdate || oldOperations == COPY_BLEND_OPERATIONS || oldOperations == KEEP_BLEND_OPERATIONS {
-								gl.enable(gl.BLEND)
-							}
-
-							# Otherwise, use actual blending
-							gl.blendFuncSeparate(_blendOperationMap[sourceColor], _blendOperationMap[targetColor], _blendOperationMap[sourceAlpha], _blendOperationMap[targetAlpha])
-							gl.blendColor(constant, constant, constant, constant)
-						}
+						# Otherwise, use actual blending
+						gl.blendFuncSeparate(_blendOperationMap[sourceColor], _blendOperationMap[targetColor], _blendOperationMap[sourceAlpha], _blendOperationMap[targetAlpha])
+						gl.blendColor(constant, constant, constant, constant)
 					}
 
 					_oldBlendConstant = _blendConstant
@@ -287,7 +278,6 @@ if TARGET == .JAVASCRIPT {
 
 		namespace HTMLContext {
 			const COPY_BLEND_OPERATIONS = _packBlendModes(.ONE, .ZERO, .ONE, .ZERO)
-			const KEEP_BLEND_OPERATIONS = _packBlendModes(.ZERO, .ONE, .ZERO, .ONE)
 
 			def from(context Context) HTMLContext {
 				assert(context == null || context is HTMLContext)
@@ -878,6 +868,7 @@ if TARGET == .JAVASCRIPT {
 
 			def framebuffer WebGLFramebuffer {
 				var gl = _context.gl
+				var colorTexture = _colorTexture.texture
 
 				# Create
 				if _generation != _context.generation {
@@ -889,7 +880,7 @@ if TARGET == .JAVASCRIPT {
 				# Update
 				if _isDirty {
 					gl.bindFramebuffer(gl.FRAMEBUFFER, _framebuffer)
-					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, _colorTexture.texture, 0)
+					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorTexture, 0)
 					assert(gl.checkFramebufferStatus(gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE)
 					_isDirty = false
 				}

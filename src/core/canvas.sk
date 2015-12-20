@@ -21,12 +21,17 @@ class Canvas {
 	# Viewport size
 	var _width = 0
 	var _height = 0
+	var _pixelWidth = 0
+	var _pixelHeight = 0
 	var _density = 1.0
 
 	# Event handlers
 	var onScroll fn(double, double) = null
 	var onPinch fn(double, double, double) = null
 	var onResize fn() = null
+	var onTouchStart fn(double, double, double) = null
+	var onTouchMove fn(double, double, double) = null
+	var onTouchEnd fn(double, double, double) = null
 
 	# Temporary objects to avoid GC
 	var _transformA = Transform.new
@@ -50,26 +55,46 @@ class Canvas {
 	def _attachToDOM(context GPU.HTMLContext) {
 		var isOSX = navigator.platform == "MacIntel" || navigator.platform == "MacPPC"
 		var canvas = context.gl.canvas
+		var centroid = Vector.new
 
 		var resize = => {
 			_width = window.innerWidth
 			_height = window.innerHeight
 			_density = window.devicePixelRatio
 
-			var width = Math.round(_width * _density) as int
-			var height = Math.round(_height * _density) as int
+			_pixelWidth = Math.round(_width * _density) as int
+			_pixelHeight = Math.round(_height * _density) as int
 
-			context.resize(width, height)
-			_color.resize(width, height, null)
+			context.resize(_pixelWidth, _pixelHeight)
+			_color.resize(_pixelWidth, _pixelHeight, null)
 
-			var transform = Transform.new
-			transform.translate(-1, 1)
-			transform.scale(2.0 / _width, -2.0 / _height)
-			_smooth.setTransformAndPixelScale(transform, _density)
+			_transformA.reset
+			_transformA.translate(-1, 1)
+			_transformA.scale(2.0 / _width, -2.0 / _height)
+			_smooth.setTransformAndPixelScale(_transformA, 1 / _density)
 
 			if onResize != null {
 				onResize()
 			}
+		}
+
+		var computeCentroid = (touches List<HTMLTouch>, centroid Vector) => {
+			centroid.set(0, 0)
+			for touch in touches {
+				centroid.x += touch.pageX
+				centroid.y += touch.pageY
+			}
+			centroid /= touches.count
+		}
+
+		var computeDistance = (touches List<HTMLTouch>, centroid Vector) double => {
+			var distance = 0.0
+			for touch in touches {
+				var dx = touch.pageX - centroid.x
+				var dy = touch.pageY - centroid.y
+				distance += Math.sqrt(dx * dx + dy * dy)
+			}
+			return distance / touches.count
 		}
 
 		canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
@@ -86,6 +111,32 @@ class Canvas {
 				}
 			}
 			e.preventDefault
+		})
+
+		canvas.addEventListener("touchstart", (e HTMLTouchEvent) => {
+			e.preventDefault
+
+			if onTouchStart != null {
+				var touches = e.touches
+				computeCentroid(touches, centroid)
+				onTouchStart(centroid.x, centroid.y, computeDistance(touches, centroid))
+			}
+		})
+
+		canvas.addEventListener("touchmove", (e HTMLTouchEvent) => {
+			if onTouchMove != null {
+				var touches = e.touches
+				computeCentroid(touches, centroid)
+				onTouchMove(centroid.x, centroid.y, computeDistance(touches, centroid))
+			}
+		})
+
+		canvas.addEventListener("touchend", (e HTMLTouchEvent) => {
+			if onTouchEnd != null {
+				var touches = e.touches
+				computeCentroid(touches, centroid)
+				onTouchEnd(centroid.x, centroid.y, computeDistance(touches, centroid))
+			}
 		})
 
 		window.addEventListener("resize", resize)
@@ -130,7 +181,11 @@ class Canvas {
 	}
 
 	def _formatNumber(value double) string {
-		return (+(value as dynamic).toFixed(6)).toString()
+		var text string = (+(value as dynamic).toFixed(6)).toString()
+		if text[0] == '-' {
+			return "−" + text.slice(1)
+		}
+		return text
 	}
 
 	def drawGrid(origin Vector, scale double) {
@@ -172,7 +227,9 @@ class Canvas {
 		var textY = Math.clamp(origin.y, 0, _height - GRID_FONT_SIZE * 1.3)
 		for x in textLeft..textRight {
 			var tx = origin.x + x * scale / textStep
-			_smooth.strokeLine(tx, origin.y - GRID_TICK_SIZE, tx, origin.y + GRID_TICK_SIZE, .BLACK, 2)
+			if x != 0 {
+				_smooth.strokeLine(tx, origin.y - GRID_TICK_SIZE, tx, origin.y + GRID_TICK_SIZE, .BLACK, 2)
+			}
 			_addText(_formatNumber(x / textStep), tx + GRID_FONT_SIZE * 0.3, textY + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE)
 		}
 
@@ -195,7 +252,14 @@ class Canvas {
 	}
 
 	def drawFunction(origin Vector, scale double) {
-		_demoMaterial.setUniformVec4(GLSLX_NAME_VALUE4, origin.x, origin.y, scale, _height)
+		_transformA.reset
+		_transformA.scale(1 / scale)
+		_transformA.translate(-origin.x, -origin.y)
+		_transformA.scale(_width * 0.5, -_height * 0.5)
+		_transformA.translate(1, -1)
+
+		_demoMaterial.setUniformFloat(GLSLX_NAME_LINE_THICKNESS, 2 * _density)
+		_demoMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformA)
 		_context.setPremultipliedBlendState
 		_context.draw(.TRIANGLE_STRIP, _demoMaterial, _quad)
 	}
@@ -208,7 +272,7 @@ class Canvas {
 		# Switch to the offscreen render target
 		_context.setTextureSet(_target)
 		_context.clear(.TRANSPARENT)
-		_context.setViewport(0, 0, _width, _height)
+		_context.setViewport(0, 0, _pixelWidth, _pixelHeight)
 		_context.setAddBlendState
 
 		# Take multiple samples of glyph outlines using the GPU
@@ -217,7 +281,7 @@ class Canvas {
 			for offset in JITTER_PATTERN {
 				_transformB.set(_transformA)
 				_transformB.translate(instance.offset)
-				_transformB.translate(offset)
+				_transformB.translate(offset.x / _density, offset.y / _density)
 				_transformB.scale(instance.scale)
 				_glyphMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformB)
 				_context.draw(.TRIANGLES, _glyphMaterial, instance.glyph.area)

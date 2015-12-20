@@ -25,12 +25,36 @@ class App {
 		}
 
 		_canvas.onPinch = (x, y, delta) => {
-			var ratio = Math.pow(0.98, delta)
-			_origin.x += (x - _origin.x) * (1 - ratio)
-			_origin.y += (y - _origin.y) * (1 - ratio)
-			_scale *= ratio
-			_invalidate
+			_adjustScaleWithPin(x, y, Math.pow(0.98, delta))
 		}
+
+		var previousX = 0.0
+		var previousY = 0.0
+		var previousDistance = 0.0
+
+		_canvas.onTouchStart = (x, y, distance) => {
+			previousX = x
+			previousY = y
+			previousDistance = distance
+		}
+
+		_canvas.onTouchMove = (x, y, distance) => {
+			if distance != 0 && previousDistance != 0 {
+				_adjustScaleWithPin(previousX, previousY, distance / previousDistance)
+			}
+			_origin.x += x - previousX
+			_origin.y += y - previousY
+			previousX = x
+			previousY = y
+			previousDistance = distance
+		}
+	}
+
+	def _adjustScaleWithPin(x double, y double, ratio double) {
+		_origin.x += (x - _origin.x) * (1 - ratio)
+		_origin.y += (y - _origin.y) * (1 - ratio)
+		_scale *= ratio
+		_invalidate
 	}
 
 	def _invalidate {

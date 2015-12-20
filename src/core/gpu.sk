@@ -43,7 +43,6 @@ namespace GPU {
 
 		def setBlendState(sourceColor BlendOperation, targetColor BlendOperation, sourceAlpha BlendOperation, targetAlpha BlendOperation, constant double)
 		def setCopyBlendState { setBlendState(.ONE, .ZERO, .ONE, .ZERO) }
-		def setKeepBlendState { setBlendState(.ZERO, .ONE, .ZERO, .ONE) }
 		def setAddBlendState { setBlendState(.ONE, .ONE, .ONE, .ONE) }
 		def setInterpolateBlendState(t double) { setBlendState(.CONSTANT, .INVERSE_CONSTANT, .CONSTANT, .INVERSE_CONSTANT, t) }
 		def setPremultipliedBlendState { setBlendState(.ONE, .INVERSE_SOURCE_ALPHA, .ONE, .INVERSE_SOURCE_ALPHA) }

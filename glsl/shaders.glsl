@@ -2,7 +2,7 @@ precision highp float;
 
 uniform sampler2D texture;
 uniform mat3 matrix3;
-uniform vec4 value4;
+uniform float lineThickness;
 
 attribute vec2 position2;
 attribute vec4 position4;
@@ -10,44 +10,6 @@ attribute vec4 coord4;
 
 varying vec2 _coord2;
 varying vec4 _coord4;
-
-export void smoothPathVertex() {
-	_coord2 = position4.zw;
-	_coord4 = coord4;
-	gl_Position = vec4(matrix3 * vec3(position4.xy, 1.0), 0.0).xywz;
-}
-
-export void smoothPathFragment() {
-	gl_FragColor = _coord4 * min(1.0, min(_coord2.x, _coord2.y));
-}
-
-export void glyphVertex() {
-	_coord2 = position4.zw;
-	gl_Position = vec4(matrix3 * vec3(position4.xy, 1.0), 0.0).xywz;
-}
-
-export void glyphFragment() {
-	if (_coord2.x * _coord2.x - _coord2.y > 0.0) {
-		discard;
-	}
-	gl_FragColor = gl_FrontFacing
-		? vec4(1.0 / 255.0, 0.0, 0.0, 0.0)
-		: vec4(0.0, 1.0 / 255.0, 0.0, 0.0);
-}
-
-export void textVertex() {
-	_coord2 = position2 * 0.5 + 0.5;
-	gl_Position = vec4(position2, 0.0, 1.0);
-}
-
-export void textFragment() {
-	vec4 sample = texture2D(texture, _coord2);
-	gl_FragColor = vec4(0.0, 0.0, 0.0, abs(sample.x - sample.y) * (255.0 / 8.0));
-}
-
-export void demoVertex() {
-	gl_Position = vec4(position2, 0.0, 1.0);
-}
 
 float gamma(float z) {
 	float c[12];
@@ -70,19 +32,65 @@ float gamma(float z) {
 	return -value * exp(-z - 12.0) * pow(z + 12.0, z + 0.5) / z;
 }
 
-export void demoFragment() {
-	vec2 pixel = gl_FragCoord.xy;
-	float x = (pixel.x - value4.x) / value4.z;
-	float y = (value4.w - pixel.y - value4.y) / value4.z;
+////////////////////////////////////////////////////////////////////////////////
 
+export void smoothPathVertex() {
+	_coord2 = position4.zw;
+	_coord4 = coord4;
+	gl_Position = vec4(matrix3 * vec3(position4.xy, 1.0), 0.0).xywz;
+}
+
+export void smoothPathFragment() {
+	gl_FragColor = _coord4 * min(1.0, min(_coord2.x, _coord2.y));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+export void glyphVertex() {
+	_coord2 = position4.zw;
+	gl_Position = vec4(matrix3 * vec3(position4.xy, 1.0), 0.0).xywz;
+}
+
+export void glyphFragment() {
+	if (_coord2.x * _coord2.x - _coord2.y > 0.0) {
+		discard;
+	}
+	gl_FragColor = gl_FrontFacing
+		? vec4(1.0 / 255.0, 0.0, 0.0, 0.0)
+		: vec4(0.0, 1.0 / 255.0, 0.0, 0.0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+export void textVertex() {
+	_coord2 = position2 * 0.5 + 0.5;
+	gl_Position = vec4(position2, 0.0, 1.0);
+}
+
+export void textFragment() {
+	vec4 sample = texture2D(texture, _coord2);
+	gl_FragColor = vec4(0.0, 0.0, 0.0, abs(sample.x - sample.y) * (255.0 / 8.0));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+export void demoVertex() {
+	_coord2 = (matrix3 * vec3(position2, 1.0)).xy;
+	gl_Position = vec4(position2, 0.0, 1.0);
+}
+
+export void demoFragment() {
+	float x = _coord2.x;
+	float y = _coord2.y;
 	float r = sqrt(x * x + y * y);
 	float theta = atan(y, x);
 
 	// float z = cos(x - sin(y)) - cos(y + sin(x));
+	float z = y - (x * x * x - x);
 	// float z = y - (sin(x * 0.1) * 10.0 - sin(x));
 	// float z = y - (sin(x) + tan(x * 0.2));
 	// float z = sin(theta * 7.0) - sin(r);
-	float z = sin(r + theta);
+	// float z = sin(r + theta);
 	// float z = y - gamma(x + 1.0);
 
 	/*
@@ -97,7 +105,7 @@ export void demoFragment() {
 	float slopeX = dFdx(z);
 	float slopeY = dFdy(z);
 	float slope = sqrt(slopeX * slopeX + slopeY * slopeY);
-	float edge = clamp(2.0 - abs(z) / slope, 0.0, 1.0);
+	float edge = clamp(lineThickness - abs(z) / slope, 0.0, 1.0);
 	float area = clamp(0.5 + z / slope, 0.0, 1.0);
 
 	float alpha = mix(edge, 1.0, area * 0.25);
