@@ -30,10 +30,32 @@ class App {
 	var _endScale = 0.0
 	var _endTime = 0.0
 
+	var _demoElement Layout.Container
+
 	def new(fontData DataArray) {
 		_canvas = Canvas.new(fontData)
 		_addEventHandlers
+		_createDemoElement
 		_startRenderLoop
+	}
+
+	def _createDemoElement {
+		_demoElement = Layout.Container.new
+
+		for codePoint in ['x', '+', '2', 'y', '−', '3', 'x', '·'] {
+			_demoElement.children.append(Layout.Character.new(codePoint))
+		}
+
+		var fraction = Layout.Fraction.new
+		for codePoint in ['4', 'y'] {
+			fraction.top.children.append(Layout.Character.new(codePoint))
+			fraction.bottom.children.append(Layout.Character.new(codePoint))
+		}
+		fraction.bottom.children.append(Layout.Character.new('+'))
+		fraction.bottom.children.append(Layout.Character.new('1'))
+		_demoElement.children.append(fraction)
+		_demoElement.children.append(Layout.Character.new('≤'))
+		_demoElement.children.append(Layout.Character.new('0'))
 	}
 
 	def _addEventHandlers {
@@ -65,6 +87,8 @@ class App {
 			var previous = oldTouches.last
 			if distance != 0 && previous.distance != 0 {
 				_adjustScaleWithPin(previous.x, previous.y, distance / previous.distance)
+			} else {
+				_invalidate
 			}
 			_origin.x += x - previous.x
 			_origin.y += y - previous.y
@@ -92,6 +116,8 @@ class App {
 							_startAnimation(.DECAY, duration)
 							_endOrigin += velocity * (flingDistance / speed)
 						}
+
+						break
 					}
 				}
 
@@ -193,7 +219,13 @@ class App {
 		_canvas.drawGrid(_origin, _scale)
 		_canvas.drawSmoothGeometry
 		_canvas.drawFunction(_origin, _scale)
+
+		_demoElement.calculateSize(_canvas, 28)
+		_demoElement.updateLayout(20, 20)
+		_demoElement.render(_canvas)
+
 		_canvas.drawText(_origin, _scale)
+		_canvas.drawSmoothGeometry
 	}
 }
 

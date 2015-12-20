@@ -34,12 +34,14 @@ class GPU.SmoothRenderer {
 	}
 
 	def flush {
-		var area = _pool.allocate(_format, _vertices.bytes)
-		if area != null {
-			_context.setPremultipliedBlendState
-			_context.draw(.TRIANGLE_STRIP, _materal, area)
-			_vertices.clear
-			area.free
+		if !_vertices.isEmpty {
+			var area = _pool.allocate(_format, _vertices.bytes)
+			if area != null {
+				_context.setPremultipliedBlendState
+				_context.draw(.TRIANGLE_STRIP, _materal, area)
+				_vertices.clear
+				area.free
+			}
 		}
 	}
 

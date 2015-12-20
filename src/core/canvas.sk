@@ -4,7 +4,7 @@ class GlyphInstance {
 	var scale = 0.0
 }
 
-class Canvas {
+class Canvas :: Layout.Renderer {
 	var _context GPU.Context
 	var _pool GPU.BufferPool
 	var _smooth GPU.SmoothRenderer
@@ -150,14 +150,14 @@ class Canvas {
 		_context.clear(.WHITE)
 	}
 
-	def _addGlyph(codePoint int, offsetX double, offsetY double, scale double) Glyph {
+	def addGlyph(codePoint int, x double, y double, scale double) Glyph {
 		if _usedInstances == _instances.count {
 			_instances.append(GlyphInstance.new)
 		}
 
 		var instance = _instances[_usedInstances]
 		instance.glyph = _font.glyph(codePoint)
-		instance.offset.set(offsetX, offsetY + _font.ascender * scale)
+		instance.offset.set(x, y + _font.ascender * scale)
 		instance.scale = scale
 		_usedInstances++
 
@@ -166,17 +166,25 @@ class Canvas {
 		return instance.glyph
 	}
 
+	def addLine(ax double, ay double, bx double, by double) {
+		_smooth.strokeLine(ax, ay, bx, by, .BLACK, 1)
+	}
+
+	def measureGlyph(codePoint int) double {
+		return _font.glyph(codePoint).advanceWidth
+	}
+
 	def _computeTextWidth(text string, scale double) double {
 		var width = 0.0
 		for i in 0..text.count {
-			width += scale * _font.glyph(text[i]).advanceWidth
+			width += scale * measureGlyph(text[i])
 		}
 		return width
 	}
 
-	def _addText(text string, offsetX double, offsetY double, scale double) {
+	def _addText(text string, x double, y double, scale double) {
 		for i in 0..text.count {
-			offsetX += scale * _addGlyph(text[i], offsetX, offsetY, scale).advanceWidth
+			x += scale * addGlyph(text[i], x, y, scale).advanceWidth
 		}
 	}
 
@@ -278,13 +286,15 @@ class Canvas {
 		# Take multiple samples of glyph outlines using the GPU
 		for i in 0.._usedInstances {
 			var instance = _instances[i]
-			for offset in JITTER_PATTERN {
-				_transformB.set(_transformA)
-				_transformB.translate(instance.offset)
-				_transformB.translate(offset.x / _density, offset.y / _density)
-				_transformB.scale(instance.scale)
-				_glyphMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformB)
-				_context.draw(.TRIANGLES, _glyphMaterial, instance.glyph.area)
+			if instance.glyph.area != null {
+				for offset in JITTER_PATTERN {
+					_transformB.set(_transformA)
+					_transformB.translate(instance.offset)
+					_transformB.translate(offset.x / _density, offset.y / _density)
+					_transformB.scale(instance.scale)
+					_glyphMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformB)
+					_context.draw(.TRIANGLES, _glyphMaterial, instance.glyph.area)
+				}
 			}
 		}
 

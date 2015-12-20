@@ -1,0 +1,164 @@
+namespace Layout {
+	const CODE_POINTS_WITH_SPACES = {
+		'+': 0,
+		'−': 0,
+		'=': 0,
+		'<': 0,
+		'>': 0,
+		'≤': 0,
+		'≥': 0,
+	}
+
+	################################################################################
+
+	class Box {
+		var x = 0.0
+		var y = 0.0
+		var width = 0.0
+		var upperHeight = 0.0
+		var lowerHeight = 0.0
+
+		def height double {
+			return upperHeight + lowerHeight
+		}
+	}
+
+	################################################################################
+
+	interface Renderer {
+		def measureGlyph(codePoint int) double
+		def addGlyph(codePoint int, x double, y double, scale double) Glyph
+		def addLine(ax double, ay double, bx double, by double)
+	}
+
+	################################################################################
+
+	class Element {
+		var box = Box.new
+		var anchorCount = 0
+
+		def updateAnchorCount
+		def calculateSize(renderer Renderer, fontSize double)
+		def updateLayout(x double, y double)
+		def render(renderer Renderer)
+	}
+
+	################################################################################
+
+	class Character : Element {
+		var codePoint int
+		var paddingLeft = 0.0
+
+		over updateAnchorCount {
+			anchorCount = 0
+		}
+
+		over calculateSize(renderer Renderer, fontSize double) {
+			box.width = renderer.measureGlyph(codePoint) * fontSize
+			paddingLeft = 0
+
+			if codePoint in CODE_POINTS_WITH_SPACES {
+				paddingLeft = renderer.measureGlyph(' ') * fontSize
+				box.width += paddingLeft * 2
+			}
+
+			box.upperHeight = fontSize / 2
+			box.lowerHeight = fontSize / 2
+		}
+
+		over updateLayout(x double, y double) {
+			box.x = x
+			box.y = y
+		}
+
+		over render(renderer Renderer) {
+			renderer.addGlyph(codePoint, box.x + paddingLeft, box.y, box.height)
+		}
+	}
+
+	################################################################################
+
+	class Container : Element {
+		var children List<Element> = []
+
+		over updateAnchorCount {
+			anchorCount = children.count + 1
+
+			for child in children {
+				child.updateAnchorCount
+				anchorCount += child.anchorCount
+			}
+		}
+
+		over calculateSize(renderer Renderer, fontSize double) {
+			box.width = 0
+			box.upperHeight = 0
+			box.lowerHeight = 0
+
+			for child in children {
+				child.calculateSize(renderer, fontSize)
+				box.width += child.box.width
+				box.upperHeight = Math.max(box.upperHeight, child.box.upperHeight)
+				box.lowerHeight = Math.max(box.lowerHeight, child.box.lowerHeight)
+			}
+
+			# If the container is empty, leave some height for the cursor
+			if children.isEmpty {
+				box.width = 4
+				box.upperHeight = fontSize / 2
+				box.lowerHeight = fontSize / 2
+			}
+		}
+
+		over updateLayout(x double, y double) {
+			box.x = x
+			box.y = y
+
+			# Center all children about the line between the upper and lower parts
+			for child in children {
+				child.updateLayout(x, y + box.upperHeight - child.box.upperHeight)
+				x += child.box.width
+			}
+		}
+
+		over render(renderer Renderer) {
+			for child in children {
+				child.render(renderer)
+			}
+		}
+	}
+
+	################################################################################
+
+	class Fraction : Element {
+		var top = Container.new
+		var bottom = Container.new
+
+		over updateAnchorCount {
+			top.updateAnchorCount
+			bottom.updateAnchorCount
+			anchorCount = top.anchorCount + bottom.anchorCount
+		}
+
+		over calculateSize(renderer Renderer, fontSize double) {
+			top.calculateSize(renderer, fontSize)
+			bottom.calculateSize(renderer, fontSize)
+			box.width = Math.max(top.box.width, bottom.box.width) + 8
+			box.upperHeight = top.box.height + 2
+			box.lowerHeight = bottom.box.height + 4
+		}
+
+		over updateLayout(x double, y double) {
+			box.x = x
+			box.y = y
+			top.updateLayout(x + (box.width - top.box.width) / 2, y)
+			bottom.updateLayout(x + (box.width - bottom.box.width) / 2, y + box.upperHeight + 4)
+		}
+
+		over render(renderer Renderer) {
+			top.render(renderer)
+			bottom.render(renderer)
+			renderer.addLine(box.x + 2, box.y + box.upperHeight + 4, box.x + box.width - 2, box.y + box.upperHeight + 4)
+		}
+	}
+}

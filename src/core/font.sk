@@ -38,7 +38,7 @@ class Font {
 	def glyph(codePoint int) Glyph {
 		var glyph = _glyphs.get(codePoint, null)
 
-		if glyph != null && glyph.area == null {
+		if glyph != null && glyph.area == null && glyph.codePoint != ' ' {
 			var end = glyph.byteOffset + glyph.byteLength
 			var scale = _scale
 			var firstX = 0.0

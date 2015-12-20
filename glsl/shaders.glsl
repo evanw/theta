@@ -86,12 +86,13 @@ export void demoFragment() {
 	float theta = atan(y, x);
 
 	// float z = cos(x - sin(y)) - cos(y + sin(x));
-	float z = y - (x * x * x - x);
+	// float z = y - (x * x * x - x);
 	// float z = y - (sin(x * 0.1) * 10.0 - sin(x));
 	// float z = y - (sin(x) + tan(x * 0.2));
 	// float z = sin(theta * 7.0) - sin(r);
 	// float z = sin(r + theta);
 	// float z = y - gamma(x + 1.0);
+	float z = 4.0 * abs(sin(4.0 * theta)) - r;
 
 	/*
 	float z = 0.0;
