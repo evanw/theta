@@ -5,6 +5,7 @@ class GlyphInstance {
 }
 
 class Canvas :: Layout.Renderer {
+	var _platform Platform
 	var _context GPU.Context
 	var _pool GPU.BufferPool
 	var _smooth GPU.SmoothRenderer
@@ -17,31 +18,22 @@ class Canvas :: Layout.Renderer {
 	var _target GPU.TextureSet
 	var _instances List<GlyphInstance> = []
 	var _usedInstances = 0
+	var _isInvalid = true
+	var _validFrames = 0
 
-	# Viewport size
-	var _width = 0
-	var _height = 0
-	var _pixelWidth = 0
-	var _pixelHeight = 0
-	var _density = 1.0
-
-	# Event handlers
-	var onScroll fn(double, double) = null
-	var onPinch fn(double, double, double) = null
-	var onResize fn() = null
-	var onTouchStart fn(double, double, double) = null
-	var onTouchMove fn(double, double, double) = null
-	var onTouchEnd fn(double, double, double) = null
+	# Viewport transform
+	var _origin = Vector.new
+	var _scale = 100.0
 
 	# Temporary objects to avoid GC
 	var _transformA = Transform.new
 	var _transformB = Transform.new
 
-	def new(fontData DataArray) {
-		_context = GPU.HTMLContext.new
+	def new(platform Platform, fontData DataArray) {
+		_platform = platform
+		_context = platform.context
 		_pool = GPU.BufferPool.new(_context)
 		_smooth = GPU.SmoothRenderer.new(_context, _pool)
-		(_context as GPU.HTMLContext).gl.getExtension("OES_standard_derivatives")
 		_demoMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_DEMO_VERTEX, GLSLX_SOURCE_DEMO_FRAGMENT)
 		_glyphMaterial = _context.createMaterial(Glyph.VERTEX_FORMAT, GLSLX_SOURCE_GLYPH_VERTEX, GLSLX_SOURCE_GLYPH_FRAGMENT)
 		_textMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_TEXT_VERTEX, GLSLX_SOURCE_TEXT_FRAGMENT)
@@ -49,103 +41,51 @@ class Canvas :: Layout.Renderer {
 		_quad = _pool.allocate(QUAD_FORMAT, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
 		_color = _context.createTexture(.RGBA_NEAREST_CLAMP, 0, 0)
 		_target = _context.createTextureSet(_color)
-		_attachToDOM(_context as GPU.HTMLContext)
+		_origin.x = _platform.width / 2
+		_origin.y = _platform.height / 2
 	}
 
-	def _attachToDOM(context GPU.HTMLContext) {
-		var isOSX = navigator.platform == "MacIntel" || navigator.platform == "MacPPC"
-		var canvas = context.gl.canvas
-		var centroid = Vector.new
+	def originX double {
+		return _origin.x
+	}
 
-		var resize = => {
-			_width = window.innerWidth
-			_height = window.innerHeight
-			_density = window.devicePixelRatio
+	def originY double {
+		return _origin.y
+	}
 
-			_pixelWidth = Math.round(_width * _density) as int
-			_pixelHeight = Math.round(_height * _density) as int
+	def scale double {
+		return _scale
+	}
 
-			context.resize(_pixelWidth, _pixelHeight)
-			_color.resize(_pixelWidth, _pixelHeight, null)
+	def setOriginAndScale(originX double, originY double, scale double) {
+		_origin.x = originX
+		_origin.y = originY
+		_scale = scale
+	}
 
-			_transformA.reset
-			_transformA.translate(-1, 1)
-			_transformA.scale(2.0 / _width, -2.0 / _height)
-			_smooth.setTransformAndPixelScale(_transformA, 1 / _density)
+	def translateOrigin(deltaX double, deltaY double) {
+		_origin.x += deltaX
+		_origin.y += deltaY
+	}
 
-			if onResize != null {
-				onResize()
-			}
-		}
-
-		var computeCentroid = (touches List<HTMLTouch>, centroid Vector) => {
-			centroid.set(0, 0)
-			for touch in touches {
-				centroid.x += touch.pageX
-				centroid.y += touch.pageY
-			}
-			centroid /= touches.count
-		}
-
-		var computeDistance = (touches List<HTMLTouch>, centroid Vector) double => {
-			var distance = 0.0
-			for touch in touches {
-				var dx = touch.pageX - centroid.x
-				var dy = touch.pageY - centroid.y
-				distance += Math.sqrt(dx * dx + dy * dy)
-			}
-			return distance / touches.count
-		}
-
-		canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
-			var swap = !isOSX && e.shiftKey
-			if e.ctrlKey || isOSX && e.metaKey {
-				if onPinch != null {
-					onPinch(e.pageX, e.pageY, e.deltaY)
-				}
-			} else {
-				if onScroll != null {
-					onScroll(
-						swap ? e.deltaY : e.deltaX,
-						swap ? e.deltaX : e.deltaY)
-				}
-			}
-			e.preventDefault
-		})
-
-		canvas.addEventListener("touchstart", (e HTMLTouchEvent) => {
-			e.preventDefault
-
-			if onTouchStart != null {
-				var touches = e.touches
-				computeCentroid(touches, centroid)
-				onTouchStart(centroid.x, centroid.y, computeDistance(touches, centroid))
-			}
-		})
-
-		canvas.addEventListener("touchmove", (e HTMLTouchEvent) => {
-			if onTouchMove != null {
-				var touches = e.touches
-				computeCentroid(touches, centroid)
-				onTouchMove(centroid.x, centroid.y, computeDistance(touches, centroid))
-			}
-		})
-
-		canvas.addEventListener("touchend", (e HTMLTouchEvent) => {
-			if onTouchEnd != null {
-				var touches = e.touches
-				computeCentroid(touches, centroid)
-				onTouchEnd(centroid.x, centroid.y, computeDistance(touches, centroid))
-			}
-		})
-
-		window.addEventListener("resize", resize)
-		document.body.appendChild(canvas)
-		resize()
+	def adjustScaleWithPin(x double, y double, ratio double) {
+		_origin.x += (x - _origin.x) * (1 - ratio)
+		_origin.y += (y - _origin.y) * (1 - ratio)
+		_scale *= ratio
 	}
 
 	def beginFrame {
+		if _color.width != _platform.pixelWidth || _color.height != _platform.pixelHeight {
+			_color.resize(_platform.pixelWidth, _platform.pixelHeight, null)
+		}
+
+		_transformA.reset
+		_transformA.translate(-1, 1)
+		_transformA.scale(2.0 / _platform.width, -2.0 / _platform.height)
+		_smooth.setTransformAndPixelScale(_transformA, 1 / _platform.density)
+
 		_usedInstances = 0
+		_context.setViewport(0, 0, _platform.pixelWidth, _platform.pixelHeight)
 		_context.setCopyBlendState
 		_context.clear(.WHITE)
 	}
@@ -196,25 +136,30 @@ class Canvas :: Layout.Renderer {
 		return text
 	}
 
-	def drawGrid(origin Vector, scale double) {
+	def drawGrid {
+		var origin = _origin
+		var scale = _scale
+		var width = _platform.width
+		var height = _platform.height
+
 		# Grid lines
 		var step = Math.pow(10, Math.round(Math.log(scale / 64) / Math.log(10)))
 		var ratio = step / scale
 		var left = Math.ceil(-origin.x * ratio) as int
 		var top = Math.ceil(-origin.y * ratio) as int
-		var right = Math.ceil((_width - origin.x) * ratio) as int
-		var bottom = Math.ceil((_height - origin.y) * ratio) as int
+		var right = Math.ceil((width - origin.x) * ratio) as int
+		var bottom = Math.ceil((height - origin.y) * ratio) as int
 
 		# Horizontal axis
 		for x in left..right {
 			var tx = origin.x + x * scale / step
-			_smooth.strokeLine(tx, 0, tx, _height, x == 0 ? .BLACK : x % 10 == 0 ? GRID_DARK : GRID_LIGHT, x == 0 ? 2 : 1)
+			_smooth.strokeLine(tx, 0, tx, height, x == 0 ? .BLACK : x % 10 == 0 ? GRID_DARK : GRID_LIGHT, x == 0 ? 2 : 1)
 		}
 
 		# Vertical axis
 		for y in top..bottom {
 			var ty = origin.y + y * scale / step
-			_smooth.strokeLine(0, ty, _width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK : GRID_LIGHT, y == 0 ? 2 : 1)
+			_smooth.strokeLine(0, ty, width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK : GRID_LIGHT, y == 0 ? 2 : 1)
 		}
 
 		# Coordinate text and tick marks
@@ -228,11 +173,11 @@ class Canvas :: Layout.Renderer {
 		var textRatio = textStep / scale
 		var textLeft = Math.ceil((-100 - origin.x) * textRatio) as int
 		var textTop = Math.ceil((-100 - origin.y) * textRatio) as int
-		var textRight = Math.ceil((_width - origin.x) * textRatio) as int
-		var textBottom = Math.ceil((_height - origin.y) * textRatio) as int
+		var textRight = Math.ceil((width - origin.x) * textRatio) as int
+		var textBottom = Math.ceil((height - origin.y) * textRatio) as int
 
 		# Horizontal axis
-		var textY = Math.clamp(origin.y, 0, _height - GRID_FONT_SIZE * 1.3)
+		var textY = Math.clamp(origin.y, 0, height - GRID_FONT_SIZE * 1.3)
 		for x in textLeft..textRight {
 			var tx = origin.x + x * scale / textStep
 			if x != 0 {
@@ -248,49 +193,50 @@ class Canvas :: Layout.Renderer {
 				var text = _formatNumber(y / textStep)
 				var ty = origin.y + y * scale / textStep
 				_smooth.strokeLine(origin.x - GRID_TICK_SIZE, ty, origin.x + GRID_TICK_SIZE, ty, .BLACK, 2)
-				_addText(text, Math.min(textX, _width - _computeTextWidth(text, GRID_FONT_SIZE) - GRID_FONT_SIZE * 0.3),
+				_addText(text, Math.min(textX, width - _computeTextWidth(text, GRID_FONT_SIZE) - GRID_FONT_SIZE * 0.3),
 					ty + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE)
 			}
 		}
 	}
 
-	def drawSmoothGeometry {
+	def flushSmoothGeometry {
 		_context.setPremultipliedBlendState
 		_smooth.flush
 	}
 
-	def drawFunction(origin Vector, scale double) {
+	def drawFunction {
 		_transformA.reset
-		_transformA.scale(1 / scale)
-		_transformA.translate(-origin.x, -origin.y)
-		_transformA.scale(_width * 0.5, -_height * 0.5)
+		_transformA.scale(1 / _scale)
+		_transformA.translate(-_origin.x, -_origin.y)
+		_transformA.scale(_platform.width * 0.5, -_platform.height * 0.5)
 		_transformA.translate(1, -1)
 
-		_demoMaterial.setUniformFloat(GLSLX_NAME_LINE_THICKNESS, 2 * _density)
+		_demoMaterial.setUniformFloat(GLSLX_NAME_LINE_THICKNESS, 2 * _platform.density)
 		_demoMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformA)
 		_context.setPremultipliedBlendState
 		_context.draw(.TRIANGLE_STRIP, _demoMaterial, _quad)
 	}
 
-	def drawText(origin Vector, scale double) {
+	def flushText {
 		_transformA.reset
 		_transformA.translate(-1, 1)
-		_transformA.scale(2.0 / _width, -2.0 / _height)
+		_transformA.scale(2.0 / _platform.width, -2.0 / _platform.height)
 
 		# Switch to the offscreen render target
 		_context.setTextureSet(_target)
 		_context.clear(.TRANSPARENT)
-		_context.setViewport(0, 0, _pixelWidth, _pixelHeight)
+		_context.setViewport(0, 0, _platform.pixelWidth, _platform.pixelHeight)
 		_context.setAddBlendState
 
 		# Take multiple samples of glyph outlines using the GPU
+		var scale = 1 / _platform.density
 		for i in 0.._usedInstances {
 			var instance = _instances[i]
 			if instance.glyph.area != null {
 				for offset in JITTER_PATTERN {
 					_transformB.set(_transformA)
 					_transformB.translate(instance.offset)
-					_transformB.translate(offset.x / _density, offset.y / _density)
+					_transformB.translate(offset.x * scale, offset.y * scale)
 					_transformB.scale(instance.scale)
 					_glyphMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformB)
 					_context.draw(.TRIANGLES, _glyphMaterial, instance.glyph.area)

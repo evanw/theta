@@ -1,0 +1,133 @@
+class HTMLPlatform :: Platform {
+	var _width = 0
+	var _height = 0
+	var _density = 0.0
+	var _pixelWidth = 0
+	var _pixelHeight = 0
+	var _context = GPU.HTMLContext.new
+	var _delegate Platform.Delegate = null
+
+	def new {
+		var isOSX = navigator.platform == "MacIntel" || navigator.platform == "MacPPC"
+		var canvas = _context.gl.canvas
+		var centroid = Vector.new
+
+		var resize = => {
+			_width = window.innerWidth
+			_height = window.innerHeight
+			_density = window.devicePixelRatio
+			_pixelWidth = Math.round(_width * _density) as int
+			_pixelHeight = Math.round(_height * _density) as int
+			_context.resize(_pixelWidth, _pixelHeight)
+			if _delegate != null {
+				_delegate.handleResize
+			}
+		}
+
+		var tick fn() = => {
+			if _delegate != null {
+				_delegate.handleFrame
+			}
+			requestAnimationFrame(tick)
+		}
+
+		canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
+			var swap = !isOSX && e.shiftKey
+			if e.ctrlKey || isOSX && e.metaKey {
+				if _delegate != null {
+					_delegate.handlePinch(e.pageX, e.pageY, e.deltaY)
+				}
+			} else {
+				if _delegate != null {
+					_delegate.handleScroll(
+						swap ? e.deltaY : e.deltaX,
+						swap ? e.deltaX : e.deltaY)
+				}
+			}
+			e.preventDefault
+		})
+
+		canvas.addEventListener("touchstart", (e HTMLTouchEvent) => {
+			e.preventDefault
+
+			if _delegate != null {
+				var touches = e.touches
+				_computeCentroid(touches, centroid)
+				_delegate.handleTouchStart(centroid.x, centroid.y, _computeDistance(touches, centroid))
+			}
+		})
+
+		canvas.addEventListener("touchmove", (e HTMLTouchEvent) => {
+			if _delegate != null {
+				var touches = e.touches
+				_computeCentroid(touches, centroid)
+				_delegate.handleTouchMove(centroid.x, centroid.y, _computeDistance(touches, centroid))
+			}
+		})
+
+		canvas.addEventListener("touchend", (e HTMLTouchEvent) => {
+			if _delegate != null {
+				var touches = e.touches
+				_computeCentroid(touches, centroid)
+				_delegate.handleTouchEnd(centroid.x, centroid.y, _computeDistance(touches, centroid))
+			}
+		})
+
+		_context.gl.getExtension("OES_standard_derivatives")
+		window.addEventListener("resize", resize)
+		document.body.appendChild(canvas)
+		resize()
+		tick()
+	}
+
+	def width int {
+		return _width
+	}
+
+	def height int {
+		return _height
+	}
+
+	def density double {
+		return _density
+	}
+
+	def pixelWidth int {
+		return _pixelWidth
+	}
+
+	def pixelHeight int {
+		return _pixelHeight
+	}
+
+	def seconds double {
+		return performance.now / 1000
+	}
+
+	def context GPU.Context {
+		return _context
+	}
+
+	def setDelegate(delegate Platform.Delegate) {
+		_delegate = delegate
+	}
+
+	def _computeCentroid(touches List<HTMLTouch>, centroid Vector) {
+		centroid.set(0, 0)
+		for touch in touches {
+			centroid.x += touch.pageX
+			centroid.y += touch.pageY
+		}
+		centroid /= touches.count
+	}
+
+	def _computeDistance(touches List<HTMLTouch>, centroid Vector) double {
+		var distance = 0.0
+		for touch in touches {
+			var dx = touch.pageX - centroid.x
+			var dy = touch.pageY - centroid.y
+			distance += Math.sqrt(dx * dx + dy * dy)
+		}
+		return distance / touches.count
+	}
+}

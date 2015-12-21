@@ -108,7 +108,7 @@ export void demoFragment() {
 	float slopeY = dFdy(z);
 	float slope = sqrt(slopeX * slopeX + slopeY * slopeY);
 	float edge = clamp(lineThickness - abs(z) / slope, 0.0, 1.0);
-	float area = clamp(0.5 + z / slope, 0.0, 1.0);
+	float area = float(z > 0.0); // clamp(0.5 + z / slope, 0.0, 1.0);
 
 	float alpha = mix(edge, 1.0, area * 0.25);
 	// float alpha = edge;

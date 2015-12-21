@@ -1,7 +1,7 @@
 class App.OldTouch {
-	var x double
-	var y double
-	var distance double
+	var centerX double
+	var centerY double
+	var averageDistance double
 	var time double
 }
 
@@ -11,18 +11,16 @@ enum App.Animation {
 	EASE_IN_OUT
 }
 
-class App {
+class App :: Platform.Delegate {
+	var _platform Platform
 	var _canvas Canvas
 	var _editor Layout.Editor
 	var _fps = 60.0
+	var _cursorToggleTime = 0.0
+	var _isCursorVisible = true
 	var _isInvalid = true
 	var _validFrames = 0
-	var _cursorToggleFrameCount = 0
-	var _isCursorVisible = true
-
-	# Viewport transform
-	var _origin = Vector.new(window.innerWidth / 2, window.innerHeight / 2)
-	var _scale = 100.0
+	var _oldTouches List<OldTouch> = []
 
 	# Animation support
 	var _animation Animation = .NONE
@@ -33,12 +31,16 @@ class App {
 	var _endScale = 0.0
 	var _endTime = 0.0
 
-	def new(fontData DataArray) {
-		_canvas = Canvas.new(fontData)
+	def new(platform Platform, fontData DataArray) {
+		_platform = platform
+		_canvas = Canvas.new(platform, fontData)
 		_editor = Layout.Editor.new(_canvas, 20, 20)
-		_addEventHandlers
-		_startRenderLoop
+		_createInitialContent
+		_resetCursorBlink
+		platform.setDelegate(self)
+	}
 
+	def _createInitialContent {
 		var c = Layout.Container.new
 		c.children.append(Layout.Character.new('y'))
 		c.children.append(Layout.Character.new('≤'))
@@ -46,130 +48,15 @@ class App {
 		_editor.insert(c)
 	}
 
-	def _addEventHandlers {
-		var oldTouches List<OldTouch> = []
+	def handleFrame {
+		var time = _platform.seconds
 
-		_canvas.onResize = => {
-			_stopAnimation
-			_draw
-		}
-
-		_canvas.onScroll = (x, y) => {
-			_stopAnimation
-			_origin.x -= x
-			_origin.y -= y
-			_invalidate
-		}
-
-		_canvas.onPinch = (x, y, delta) => {
-			_stopAnimation
-			_adjustScaleWithPin(x, y, Math.pow(0.98, delta))
-		}
-
-		_canvas.onTouchStart = (x, y, distance) => {
-			_stopAnimation
-			oldTouches.append(OldTouch.new(x, y, distance, _seconds))
-		}
-
-		_canvas.onTouchMove = (x, y, distance) => {
-			var previous = oldTouches.last
-			if distance != 0 && previous.distance != 0 {
-				_adjustScaleWithPin(previous.x, previous.y, distance / previous.distance)
-			} else {
-				_invalidate
-			}
-			_origin.x += x - previous.x
-			_origin.y += y - previous.y
-			oldTouches.append(OldTouch.new(x, y, distance, _seconds))
-		}
-
-		_canvas.onTouchEnd = (x, y, distance) => {
-			if distance.isNaN {
-				var count = oldTouches.count
-				var time = _seconds
-
-				# Search for an old touch that was long enough ago that the velocity should be stable
-				for i = count - 2; i >= 0; i-- {
-					var before = oldTouches[i]
-
-					if time - before.time > 0.1 {
-						var after = oldTouches[i + 1]
-						var scale = 1 / (after.time - before.time)
-						var velocity = Vector.new((after.x - before.x) * scale, (after.y - before.y) * scale)
-						var speed = velocity.length
-						var duration = Math.log(1 + speed) / 5
-						var flingDistance = speed * duration / 5 # Divide by 5 since a quintic decay function has an initial slope of 5
-
-						if speed > 50 {
-							_startAnimation(.DECAY, duration)
-							_endOrigin += velocity * (flingDistance / speed)
-						}
-
-						break
-					}
-				}
-
-				oldTouches = []
-			} else {
-				oldTouches.append(OldTouch.new(x, y, distance, _seconds))
-			}
-		}
-	}
-
-	def _seconds double {
-		return performance.now / 1000
-	}
-
-	def _startAnimation(animation Animation, duration double) {
-		_animation = animation
-
-		# Configure the start
-		_startOrigin.set(_origin)
-		_startScale = _scale
-		_startTime = _seconds
-
-		# Configure the end
-		_endOrigin.set(_startOrigin)
-		_endScale = _startScale
-		_endTime = _startTime + duration
-	}
-
-	def _stopAnimation {
-		_animation = .NONE
-	}
-
-	def _adjustScaleWithPin(x double, y double, ratio double) {
-		_origin.x += (x - _origin.x) * (1 - ratio)
-		_origin.y += (y - _origin.y) * (1 - ratio)
-		_scale *= ratio
-		_invalidate
-	}
-
-	def _invalidate {
-		_isInvalid = true
-	}
-
-	def _resetCursorBlink {
-		_isCursorVisible = true
-		_cursorToggleFrameCount = 0
-	}
-
-	def _startRenderLoop {
-		var tick fn() = => {
-			_tick
-			requestAnimationFrame(tick)
-		}
-		tick()
-	}
-
-	def _tick {
 		if _animation != .NONE {
-			var t = (_seconds - _startTime) / (_endTime - _startTime)
+			var t = (time - _startTime) / (_endTime - _startTime)
 
 			# Stop the animation once it's done
 			if t > 1 {
-				_origin.set(_endOrigin)
-				_scale = _endScale
+				_canvas.setOriginAndScale(_endOrigin.x, _endOrigin.y, _endScale)
 				_animation = .NONE
 			}
 
@@ -184,19 +71,18 @@ class App {
 				}
 
 				# Animate both origin and scale
-				_scale = 1 / (1 / _startScale + (1 / _endScale - 1 / _startScale) * t)
-				_origin.set(_endOrigin)
-				_origin -= _startOrigin
-				_origin *= t
-				_origin += _startOrigin
+				_canvas.setOriginAndScale(
+					_startOrigin.x + (_endOrigin.x - _startOrigin.x) * t,
+					_startOrigin.y + (_endOrigin.y - _startOrigin.y) * t,
+					1 / (1 / _startScale + (1 / _endScale - 1 / _startScale) * t))
 			}
 
 			_invalidate
 		}
 
 		# Toggle the cursor periodically
-		if ++_cursorToggleFrameCount == 30 {
-			_cursorToggleFrameCount = 0
+		if time > _cursorToggleTime {
+			_cursorToggleTime = time + CURSOR_BLINK_DELAY
 			_isCursorVisible = !_isCursorVisible
 		}
 
@@ -214,26 +100,120 @@ class App {
 		}
 	}
 
-	var _anchorIndex = 0
+	def handleScroll(deltaX double, deltaY double) {
+		_stopAnimation
+		_canvas.translateOrigin(-deltaX, -deltaY)
+		_invalidate
+	}
+
+	def handlePinch(x double, y double, delta double) {
+		_stopAnimation
+		_canvas.adjustScaleWithPin(x, y, Math.pow(0.98, delta))
+		_invalidate
+	}
+
+	def handleResize {
+		_stopAnimation
+		_draw
+	}
+
+	def handleTouchStart(centerX double, centerY double, averageDistance double) {
+		_stopAnimation
+		_oldTouches.append(OldTouch.new(centerX, centerY, averageDistance, _platform.seconds))
+	}
+
+	def handleTouchMove(centerX double, centerY double, averageDistance double) {
+		var previous = _oldTouches.last
+		if averageDistance != 0 && previous.averageDistance != 0 {
+			_canvas.adjustScaleWithPin(previous.centerX, previous.centerY, averageDistance / previous.averageDistance)
+		}
+		_canvas.translateOrigin(centerX - previous.centerX, centerY - previous.centerY)
+		_oldTouches.append(OldTouch.new(centerX, centerY, averageDistance, _platform.seconds))
+		_invalidate
+	}
+
+	def handleTouchEnd(centerX double, centerY double, averageDistance double) {
+		if !averageDistance.isNaN {
+			_oldTouches.append(OldTouch.new(centerX, centerY, averageDistance, _platform.seconds))
+			return
+		}
+
+		var count = _oldTouches.count
+		var time = _platform.seconds
+
+		# Search for an old touch that was long enough ago that the velocity should be stable
+		for i = count - 2; i >= 0; i-- {
+			var before = _oldTouches[i]
+
+			# Ignore old touches that are too recent
+			if time - before.time > 0.1 {
+				var after = _oldTouches[i + 1]
+				var scale = 1 / (after.time - before.time)
+				var velocity = Vector.new((after.centerX - before.centerX) * scale, (after.centerY - before.centerY) * scale)
+				var speed = velocity.length
+				var duration = Math.log(1 + speed) / 5
+				var flingDistance = speed * duration / 5 # Divide by 5 since a quintic decay function has an initial slope of 5
+
+				# Only fling if the speed is fast enough
+				if speed > 50 {
+					_startAnimation(.DECAY, duration)
+					_endOrigin += velocity * (flingDistance / speed)
+				}
+				break
+			}
+		}
+
+		_oldTouches = []
+	}
+
+	def _invalidate {
+		_isInvalid = true
+	}
+
+	def _startAnimation(animation Animation, duration double) {
+		_animation = animation
+
+		# Configure the start
+		_startOrigin.x = _canvas.originX
+		_startOrigin.y = _canvas.originY
+		_startScale = _canvas.scale
+		_startTime = _platform.seconds
+
+		# Configure the end
+		_endOrigin.set(_startOrigin)
+		_endScale = _startScale
+		_endTime = _startTime + duration
+	}
+
+	def _stopAnimation {
+		_animation = .NONE
+	}
+
+	def _resetCursorBlink {
+		_isCursorVisible = true
+		_cursorToggleTime = _platform.seconds + CURSOR_BLINK_DELAY
+	}
 
 	def _draw {
 		_canvas.beginFrame
-		_canvas.drawGrid(_origin, _scale)
-		_canvas.drawSmoothGeometry
-		_canvas.drawFunction(_origin, _scale)
+		_canvas.drawGrid
+		_canvas.flushSmoothGeometry
+		_canvas.drawFunction
 		_editor.render(_isCursorVisible)
-		_canvas.drawText(_origin, _scale)
-		_canvas.drawSmoothGeometry
+		_canvas.flushText
+		_canvas.flushSmoothGeometry
 	}
 }
 
 namespace App {
+	const CURSOR_BLINK_DELAY = 0.5
+
 	@entry
 	def main {
 		var xhr = XMLHttpRequest.new
 		xhr.open("GET", "fonts.bin")
 		xhr.onload = => {
-			new(DataArray.new(Uint8Array.new(xhr.response)))
+			new(HTMLPlatform.new, DataArray.new(Uint8Array.new(xhr.response)))
 		}
 		xhr.responseType = "arraybuffer"
 		xhr.send

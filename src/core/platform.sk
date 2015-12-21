@@ -1,0 +1,20 @@
+interface Platform.Delegate {
+	def handleFrame
+	def handleScroll(deltaX double, deltaY double)
+	def handlePinch(x double, y double, delta double)
+	def handleResize
+	def handleTouchStart(centerX double, centerY double, averageDistance double)
+	def handleTouchMove(centerX double, centerY double, averageDistance double)
+	def handleTouchEnd(centerX double, centerY double, averageDistance double)
+}
+
+interface Platform {
+	def width int
+	def height int
+	def density double
+	def pixelWidth int
+	def pixelHeight int
+	def seconds double
+	def context GPU.Context
+	def setDelegate(delegate Delegate)
+}

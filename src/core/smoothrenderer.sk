@@ -157,9 +157,9 @@ class GPU.SmoothRenderer {
 			var v = halfWidth / d
 			var vx = -dy * v
 			var vy = dx * v
-			_appendVertex(v0.x - ux - vx, v0.y - uy - vy, 0, -aa, color)
+			_appendVertex(v0.x - ux - vx, v0.y - uy - vy, -aa, 0, color)
 			_appendPreviousVertex
-			_appendVertex(v0.x - ux + vx, v0.y - uy + vy, -aa, 0, color)
+			_appendVertex(v0.x - ux + vx, v0.y - uy + vy, 0, -aa, color)
 			_appendVertex(v0.x + ux - vx, v0.y + uy - vy, 0, aa, color)
 			_appendVertex(v0.x + ux + vx, v0.y + uy + vy, aa, 0, color)
 		}
@@ -200,8 +200,8 @@ class GPU.SmoothRenderer {
 			var v = halfWidth / d, vx = -dy * v, vy = dx * v
 			_appendVertex(v1.x - ux - vx, v1.y - uy - vy, 0, aa, color)
 			_appendVertex(v1.x - ux + vx, v1.y - uy + vy, aa, 0, color)
-			_appendVertex(v1.x + ux - vx, v1.y + uy - vy, 0, -aa, color)
-			_appendVertex(v1.x + ux + vx, v1.y + uy + vy, -aa, 0, color)
+			_appendVertex(v1.x + ux - vx, v1.y + uy - vy, -aa, 0, color)
+			_appendVertex(v1.x + ux + vx, v1.y + uy + vy, 0, -aa, color)
 		}
 		_appendPreviousVertex
 	}
