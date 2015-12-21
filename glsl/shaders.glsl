@@ -2,6 +2,7 @@ precision highp float;
 
 uniform sampler2D texture;
 uniform mat3 matrix3;
+uniform vec3 color;
 uniform float lineThickness;
 
 attribute vec2 position2;
@@ -55,9 +56,10 @@ export void glyphFragment() {
 	if (_coord2.x * _coord2.x - _coord2.y > 0.0) {
 		discard;
 	}
-	gl_FragColor = gl_FrontFacing
-		? vec4(1.0 / 255.0, 0.0, 0.0, 0.0)
-		: vec4(0.0, 1.0 / 255.0, 0.0, 0.0);
+
+	// Upper 4 bits: front faces
+	// Lower 4 bits: back faces
+	gl_FragColor = vec4(color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0), 0.0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -68,8 +70,24 @@ export void textVertex() {
 }
 
 export void textFragment() {
-	vec4 sample = texture2D(texture, _coord2);
-	gl_FragColor = vec4(0.0, 0.0, 0.0, abs(sample.x - sample.y) * (255.0 / 8.0));
+	// Get samples for -2/3 and -1/3
+	vec2 valueL = texture2D(texture, vec2(_coord2.x + dFdx(_coord2.x), _coord2.y)).yz * 255.0;
+	vec2 lowerL = mod(valueL, 16.0);
+	vec2 upperL = (valueL - lowerL) / 16.0;
+	vec2 alphaL = min(abs(upperL - lowerL), 2.0);
+
+	// Get samples for 0, +1/3, and +2/3
+	vec3 valueR = texture2D(texture, _coord2).xyz * 255.0;
+	vec3 lowerR = mod(valueR, 16.0);
+	vec3 upperR = (valueR - lowerR) / 16.0;
+	vec3 alphaR = min(abs(upperR - lowerR), 2.0);
+
+	// Make sure to do gamma correction
+	gl_FragColor = vec4(sqrt(1.0 - vec3(
+		alphaR.x + alphaR.y + alphaR.z,
+		alphaL.y + alphaR.x + alphaR.y,
+		alphaL.x + alphaL.y + alphaR.x
+	) / 6.0), 1.0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

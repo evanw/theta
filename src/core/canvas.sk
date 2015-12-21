@@ -233,11 +233,15 @@ class Canvas :: Layout.Renderer {
 		for i in 0.._usedInstances {
 			var instance = _instances[i]
 			if instance.glyph.area != null {
-				for offset in JITTER_PATTERN {
+				for j in 0..JITTER_PATTERN.count {
+					var offset = JITTER_PATTERN[j]
 					_transformB.set(_transformA)
 					_transformB.translate(instance.offset)
 					_transformB.translate(offset.x * scale, offset.y * scale)
 					_transformB.scale(instance.scale)
+					if j % 2 == 0 {
+						_glyphMaterial.setUniformVec3(GLSLX_NAME_COLOR, j == 0 ? 1 : 0, j == 2 ? 1 : 0, j == 4 ? 1 : 0)
+					}
 					_glyphMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformB)
 					_context.draw(.TRIANGLES, _glyphMaterial, instance.glyph.area)
 				}
@@ -246,7 +250,7 @@ class Canvas :: Layout.Renderer {
 
 		# Composite the offscreen render target back onto the canvas using the non-zero winding rule
 		_context.setTextureSet(null)
-		_context.setPremultipliedBlendState
+		_context.setBlendState(.ZERO, .SOURCE_COLOR, .ZERO, .INVERSE_SOURCE_COLOR)
 		_textMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
 		_context.draw(.TRIANGLE_STRIP, _textMaterial, _quad)
 	}
@@ -260,6 +264,29 @@ namespace Canvas {
 	const QUAD_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
 
 	if true {
+		# 6x subpixel AA pattern (3x in x, 2x in y)
+		#
+		#   R = (f(x - 2/3, y) + f(x - 1/3, y) + f(x, y)) / 3
+		#   G = (f(x - 1/3, y) + f(x, y) + f(x + 1/3, y)) / 3
+		#   B = (f(x, y) + f(x + 1/3, y) + f(x + 2/3, y)) / 3
+		#
+		# The shader would require three texture lookups if the texture format
+		# stored data for offsets -1/3, 0, and +1/3 since the shader also needs
+		# data for offsets -2/3 and +2/3. To avoid this, the texture format stores
+		# data for offsets 0, +1/3, and +2/3 instead. That way the shader can get
+		# data for offsets -2/3 and -1/3 with only one additional texture lookup.
+		#
+		const JITTER_PATTERN = [
+			Vector.new(-1 / 12.0, -1 / 4.0),
+			Vector.new( 1 / 12.0,  1 / 4.0),
+			Vector.new( 3 / 12.0, -1 / 4.0),
+			Vector.new( 5 / 12.0,  1 / 4.0),
+			Vector.new( 7 / 12.0, -1 / 4.0),
+			Vector.new( 9 / 12.0,  1 / 4.0),
+		]
+	}
+
+	else if true {
 		# 8x MSAA pattern
 		const JITTER_PATTERN = [
 			Vector.new(-3 / 16.0, -5 / 16.0),
@@ -271,7 +298,9 @@ namespace Canvas {
 			Vector.new( 3 / 16.0,  7 / 16.0),
 			Vector.new(-7 / 16.0, -1 / 16.0),
 		]
-	} else {
+	}
+
+	else {
 		# 4x MSAA pattern
 		const JITTER_PATTERN = [
 			Vector.new( 1 / 8.0,  3 / 8.0),
