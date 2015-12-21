@@ -31,6 +31,13 @@ class HTMLPlatform :: Platform {
 			requestAnimationFrame(tick)
 		}
 
+		var flagsFromEvent = (e HTMLKeyboardEvent) Platform.KeyFlags => {
+			return
+				(e.altKey ? .ALT : 0) |
+				((isOSX ? e.metaKey : e.ctrlKey) ? .META : 0) |
+				(e.shiftKey ? .SHIFT : 0)
+		}
+
 		canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
 			var swap = !isOSX && e.shiftKey
 			if e.ctrlKey || isOSX && e.metaKey {
@@ -70,6 +77,41 @@ class HTMLPlatform :: Platform {
 				var touches = e.touches
 				_computeCentroid(touches, centroid)
 				_delegate.handleTouchEnd(centroid.x, centroid.y, _computeDistance(touches, centroid))
+			}
+		})
+
+		document.addEventListener("keydown", (e HTMLKeyboardEvent) => {
+			var key Platform.KeyCode
+			var which = e.which
+			var hasKey = true
+
+			if which == 8 {
+				e.preventDefault
+				key = .BACKSPACE
+			}
+			else if which == 37 { key = .LEFT }
+			else if which == 38 { key = .UP }
+			else if which == 39 { key = .RIGHT }
+			else if which == 40 { key = .DOWN }
+			else if which == 46 { key = .DELETE }
+			else { hasKey = false }
+
+			if hasKey && _delegate != null {
+				_delegate.handleKeyCode(key, flagsFromEvent(e))
+			}
+		})
+
+		document.addEventListener("keypress", (e HTMLKeyboardEvent) => {
+			var code = e.which
+			if _delegate != null && (
+				code >= 'a' && code <= 'z' ||
+				code >= 'A' && code <= 'Z' ||
+				code >= '0' && code <= '9' || code == '.' ||
+				code == '+' || code == '-' || code == '*' ||
+				code == '<' || code == '>' || code == '≤' || code == '≥' || code == '=' ||
+				code == ','
+			) {
+				_delegate.handleCodePoint(code, flagsFromEvent(e))
 			}
 		})
 

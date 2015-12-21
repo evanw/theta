@@ -6,6 +6,8 @@ interface Platform.Delegate {
 	def handleTouchStart(centerX double, centerY double, averageDistance double)
 	def handleTouchMove(centerX double, centerY double, averageDistance double)
 	def handleTouchEnd(centerX double, centerY double, averageDistance double)
+	def handleKeyCode(key KeyCode, flags KeyFlags)
+	def handleCodePoint(codePoint int, flags KeyFlags)
 }
 
 interface Platform {
@@ -17,4 +19,19 @@ interface Platform {
 	def seconds double
 	def context GPU.Context
 	def setDelegate(delegate Delegate)
+}
+
+flags Platform.KeyFlags {
+	ALT
+	META
+	SHIFT
+}
+
+enum Platform.KeyCode {
+	BACKSPACE
+	LEFT
+	UP
+	RIGHT
+	DOWN
+	DELETE
 }

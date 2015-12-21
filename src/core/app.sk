@@ -166,6 +166,30 @@ class App :: Platform.Delegate {
 		_oldTouches = []
 	}
 
+	def handleKeyCode(key Platform.KeyCode, flags Platform.KeyFlags) {
+		switch key {
+			case .LEFT {
+				_editor.moveByX(-1)
+				_resetCursorBlink
+			}
+
+			case .RIGHT {
+				_editor.moveByX(1)
+				_resetCursorBlink
+			}
+		}
+	}
+
+	def handleCodePoint(codePoint int, flags Platform.KeyFlags) {
+		if codePoint == '-' { codePoint = '−' }
+		else if codePoint == '*' { codePoint = '·' }
+
+		var c = Layout.Container.new
+		c.children.append(Layout.Character.new(codePoint))
+		_editor.insert(c)
+		_resetCursorBlink
+	}
+
 	def _invalidate {
 		_isInvalid = true
 	}
@@ -190,8 +214,9 @@ class App :: Platform.Delegate {
 	}
 
 	def _resetCursorBlink {
-		_isCursorVisible = true
 		_cursorToggleTime = _platform.seconds + CURSOR_BLINK_DELAY
+		_isCursorVisible = true
+		_invalidate
 	}
 
 	def _draw {

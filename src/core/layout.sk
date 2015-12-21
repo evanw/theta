@@ -116,7 +116,11 @@ namespace Layout {
 			box.width = renderer.measureGlyph(codePoint) * fontSize
 			paddingLeft = 0
 
-			if codePoint in CODE_POINTS_WITH_SPACES {
+			if codePoint == ',' {
+				box.width += renderer.measureGlyph(' ') * fontSize
+			}
+
+			else if codePoint in CODE_POINTS_WITH_SPACES {
 				paddingLeft = renderer.measureGlyph(' ') * fontSize
 				box.width += paddingLeft * 2
 			}
@@ -262,12 +266,16 @@ namespace Layout {
 			}
 		}
 
+		def moveByX(delta int) {
+			_cursorIndex = Math.clamp(_cursorIndex + delta, 0, _container.anchorCount - 1)
+		}
+
 		def insert(container Container) {
 			var clone = container.clone as Container
 			clone.updateAnchorCount
 			_anchor.loadFrom(_container, _cursorIndex)
 			_anchor.container.children.insert(_anchor.indexInContainer, clone.children)
-			_cursorIndex += clone.anchorCount
+			_cursorIndex += clone.anchorCount - 1
 			_updateAfterChange
 		}
 
