@@ -1,7 +1,5 @@
 namespace Layout {
 	const CODE_POINTS_WITH_SPACES = {
-		'+': 0,
-		'−': 0,
 		'=': 0,
 		'<': 0,
 		'>': 0,
@@ -93,7 +91,7 @@ namespace Layout {
 
 		def clone Element
 		def updateAnchorCount
-		def calculateSize(renderer Renderer, fontSize double)
+		def calculateSize(renderer Renderer, parent Container, fontSize double)
 		def updateLayout(x double, y double)
 		def render(renderer Renderer)
 	}
@@ -112,7 +110,7 @@ namespace Layout {
 			anchorCount = 0
 		}
 
-		over calculateSize(renderer Renderer, fontSize double) {
+		over calculateSize(renderer Renderer, parent Container, fontSize double) {
 			box.width = renderer.measureGlyph(codePoint) * fontSize
 			paddingLeft = 0
 
@@ -120,7 +118,7 @@ namespace Layout {
 				box.width += renderer.measureGlyph(' ') * fontSize
 			}
 
-			else if codePoint in CODE_POINTS_WITH_SPACES {
+			else if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '−') && self != parent.children.first {
 				paddingLeft = renderer.measureGlyph(' ') * fontSize
 				box.width += paddingLeft * 2
 			}
@@ -161,13 +159,13 @@ namespace Layout {
 			}
 		}
 
-		over calculateSize(renderer Renderer, fontSize double) {
+		over calculateSize(renderer Renderer, parent Container, fontSize double) {
 			box.width = 0
 			box.upperHeight = 0
 			box.lowerHeight = 0
 
 			for child in children {
-				child.calculateSize(renderer, fontSize)
+				child.calculateSize(renderer, self, fontSize)
 				box.width += child.box.width
 				box.upperHeight = Math.max(box.upperHeight, child.box.upperHeight)
 				box.lowerHeight = Math.max(box.lowerHeight, child.box.lowerHeight)
@@ -218,9 +216,9 @@ namespace Layout {
 			anchorCount = top.anchorCount + bottom.anchorCount
 		}
 
-		over calculateSize(renderer Renderer, fontSize double) {
-			top.calculateSize(renderer, fontSize)
-			bottom.calculateSize(renderer, fontSize)
+		over calculateSize(renderer Renderer, parent Container, fontSize double) {
+			top.calculateSize(renderer, null, fontSize)
+			bottom.calculateSize(renderer, null, fontSize)
 			box.width = Math.max(top.box.width, bottom.box.width) + 8
 			box.upperHeight = top.box.height + 2
 			box.lowerHeight = bottom.box.height + 4
@@ -280,7 +278,7 @@ namespace Layout {
 		}
 
 		def _updateAfterChange {
-			_container.calculateSize(_renderer, BASE_FONT_SIZE)
+			_container.calculateSize(_renderer, null, BASE_FONT_SIZE)
 			_container.updateLayout(_originX, _originY)
 			_container.updateAnchorCount
 		}

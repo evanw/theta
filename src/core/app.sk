@@ -185,7 +185,11 @@ class App :: Platform.Delegate {
 		else if codePoint == '*' { codePoint = '·' }
 
 		var c = Layout.Container.new
-		c.children.append(Layout.Character.new(codePoint))
+		if codePoint == '/' {
+			c.children.append(Layout.Fraction.new)
+		} else {
+			c.children.append(Layout.Character.new(codePoint))
+		}
 		_editor.insert(c)
 		_resetCursorBlink
 	}
