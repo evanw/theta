@@ -81,23 +81,37 @@ class HTMLPlatform :: Platform {
 		})
 
 		document.addEventListener("keydown", (e HTMLKeyboardEvent) => {
-			var key Platform.KeyCode
+			var shortcut Platform.Shortcut
 			var which = e.which
-			var hasKey = true
+			var isLine = isOSX && e.metaKey
+			var isWord = isOSX ? e.altKey : e.ctrlKey
+			var hasShortcut = true
 
-			if which == 8 {
+			const KEY_BACKSPACE = 8
+			const KEY_END = 35
+			const KEY_HOME = 36
+			const KEY_LEFT = 37
+			const KEY_UP = 38
+			const KEY_RIGHT = 39
+			const KEY_DOWN = 40
+			const KEY_DELETE = 46
+
+			if which == KEY_BACKSPACE { shortcut = isWord ? .DELETE_LEFT_WORD : .DELETE_LEFT_CHARACTER }
+			else if which == KEY_LEFT { shortcut = isLine ? .MOVE_LEFT_LINE : isWord ? .MOVE_LEFT_WORD : .MOVE_LEFT_CHARACTER }
+			else if which == KEY_RIGHT { shortcut = isLine ? .MOVE_RIGHT_LINE : isWord ? .MOVE_RIGHT_WORD : .MOVE_RIGHT_CHARACTER }
+			else if which == KEY_UP { shortcut = .MOVE_UP }
+			else if which == KEY_DOWN { shortcut = .MOVE_DOWN }
+			else if which == KEY_DELETE { shortcut = isWord ? .DELETE_RIGHT_WORD : .DELETE_RIGHT_CHARACTER }
+			else if which == KEY_HOME { shortcut = .MOVE_LEFT_LINE }
+			else if which == KEY_END { shortcut = .MOVE_RIGHT_LINE }
+			else if which == 'K' && isOSX && e.ctrlKey { shortcut = .DELETE_RIGHT_LINE }
+			else { hasShortcut = false }
+
+			if hasShortcut {
 				e.preventDefault
-				key = .BACKSPACE
-			}
-			else if which == 37 { key = .LEFT }
-			else if which == 38 { key = .UP }
-			else if which == 39 { key = .RIGHT }
-			else if which == 40 { key = .DOWN }
-			else if which == 46 { key = .DELETE }
-			else { hasKey = false }
-
-			if hasKey && _delegate != null {
-				_delegate.handleKeyCode(key, flagsFromEvent(e))
+				if _delegate != null {
+					_delegate.handleShortcut(shortcut)
+				}
 			}
 		})
 

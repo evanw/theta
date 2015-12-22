@@ -32,54 +32,68 @@ namespace Layout {
 	################################################################################
 
 	class Anchor {
-		var container Container = null
-		var indexInContainer = 0
+		const _root Container
+		var globalIndex = 0
+		var nestedContainer Container = null
+		var indexInNestedContainer = 0
 
-		def render(renderer Renderer) {
-			var x = container.box.x
-			for i in 0..indexInContainer {
-				x += container.children[i].box.width
-			}
-			renderer.addLine(x, container.box.y, x, container.box.y + container.box.height)
+		def new(root Container) {
+			_root = root
+			updateNestedState
 		}
 
-		def loadFrom(rootContainer Container, rootIndex int) {
-			assert(0 <= rootIndex && rootIndex < rootContainer.anchorCount)
-			var count = rootContainer.children.count
+		def render(renderer Renderer) {
+			var x = nestedContainer.box.x
+			for i in 0..indexInNestedContainer {
+				x += nestedContainer.children[i].box.width
+			}
+			if nestedContainer.children.isEmpty {
+        x += nestedContainer.box.width / 2
+      }
+			renderer.addLine(x, nestedContainer.box.y, x, nestedContainer.box.y + nestedContainer.box.height)
+		}
+
+		def updateNestedState {
+			_updateNestedState(_root, globalIndex)
+		}
+
+		def _updateNestedState(container Container, index int) {
+			assert(0 <= index && index < container.anchorCount)
+			var count = container.children.count
 
 			# Search the children for the anchor
 			for i in 0..count {
-				var child = rootContainer.children[i]
+				var child = container.children[i]
 
 				# Check before this child
-				if rootIndex == 0 {
-					container = rootContainer
-					indexInContainer = i
+				if index == 0 {
+					nestedContainer = container
+					indexInNestedContainer = i
 					return
 				}
-				rootIndex--
+				index--
 
 				# Check inside this child
-				if rootIndex < child.anchorCount {
+				if index < child.anchorCount {
 					if child is Fraction {
 						var fraction = child as Fraction
-						if rootIndex < fraction.top.anchorCount {
-							loadFrom(fraction.top, rootIndex)
+						if index < fraction.top.anchorCount {
+							_updateNestedState(fraction.top, index)
 						} else {
-							loadFrom(fraction.bottom, rootIndex - fraction.top.anchorCount)
+							_updateNestedState(fraction.bottom, index - fraction.top.anchorCount)
 						}
 						return
 					} else {
 						assert(false)
 					}
 				}
-				rootIndex -= child.anchorCount
+				index -= child.anchorCount
 			}
 
 			# Must be after the last child
-			assert(rootIndex == 0)
-			container = rootContainer
-			indexInContainer = count
+			assert(index == 0)
+			nestedContainer = container
+			indexInNestedContainer = count
 		}
 	}
 
@@ -111,14 +125,14 @@ namespace Layout {
 		}
 
 		over calculateSize(renderer Renderer, parent Container, fontSize double) {
-			box.width = renderer.measureGlyph(codePoint) * fontSize
+			box.width = renderer.measureGlyph(codePointWithSubstitution) * fontSize
 			paddingLeft = 0
 
 			if codePoint == ',' {
 				box.width += renderer.measureGlyph(' ') * fontSize
 			}
 
-			else if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '−') && self != parent.children.first {
+			else if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && self != parent.children.first {
 				paddingLeft = renderer.measureGlyph(' ') * fontSize
 				box.width += paddingLeft * 2
 			}
@@ -133,7 +147,13 @@ namespace Layout {
 		}
 
 		over render(renderer Renderer) {
-			renderer.addGlyph(codePoint, box.x + paddingLeft, box.y, box.height)
+			renderer.addGlyph(codePointWithSubstitution, box.x + paddingLeft, box.y, box.height)
+		}
+
+		def codePointWithSubstitution int {
+			if codePoint == '-' { return '−' }
+			if codePoint == '*' { return '·' }
+			return codePoint
 		}
 	}
 
@@ -240,47 +260,104 @@ namespace Layout {
 
 	################################################################################
 
+	enum Direction {
+		LEFT
+		RIGHT
+
+		def delta int {
+			return self == LEFT ? -1 : 1
+		}
+	}
+
+	enum Boundary {
+		CHARACTER
+		WORD
+		LINE
+	}
+
+	interface Editor.Delegate {
+		def handleEditorUpdate
+	}
+
 	class Editor {
 		const _renderer Renderer
 		const _originX int
 		const _originY int
 		const _container = Container.new
-		const _anchor = Anchor.new
-		var _cursorIndex = 0
+		const _anchor Anchor
+		var _delegate Delegate = null
 
 		def new(renderer Renderer, originX int, originY int) {
 			_renderer = renderer
 			_originX = originX
 			_originY = originY
+			_anchor = Anchor.new(_container)
 			_updateAfterChange
+		}
+
+		def setDelegate(delegate Delegate) {
+			_delegate = delegate
 		}
 
 		def render(showCursor bool) {
 			_container.render(_renderer)
-
 			if showCursor {
-				_anchor.loadFrom(_container, _cursorIndex)
 				_anchor.render(_renderer)
 			}
 		}
 
-		def moveByX(delta int) {
-			_cursorIndex = Math.clamp(_cursorIndex + delta, 0, _container.anchorCount - 1)
+		def move(direction Direction, boundary Boundary) {
+			switch boundary {
+				case .CHARACTER {
+					_anchor.globalIndex = Math.clamp(_anchor.globalIndex + direction.delta, 0, _container.anchorCount - 1)
+					_anchor.updateNestedState
+					_notifyDelegate
+				}
+
+				case .WORD {
+				}
+
+				case .LINE {
+					_anchor.globalIndex = direction == .LEFT ? 0 : _container.anchorCount - 1
+					_anchor.updateNestedState
+					_notifyDelegate
+				}
+			}
+		}
+
+		def delete(direction Direction, boundary Boundary) {
+			switch boundary {
+				case .CHARACTER {
+				}
+
+				case .WORD {
+				}
+
+				case .LINE {
+				}
+			}
 		}
 
 		def insert(container Container) {
 			var clone = container.clone as Container
 			clone.updateAnchorCount
-			_anchor.loadFrom(_container, _cursorIndex)
-			_anchor.container.children.insert(_anchor.indexInContainer, clone.children)
-			_cursorIndex += clone.anchorCount - 1
+			_anchor.nestedContainer.children.insert(_anchor.indexInNestedContainer, clone.children)
 			_updateAfterChange
+			_anchor.globalIndex += clone.anchorCount - 1
+			_anchor.updateNestedState
+			_notifyDelegate
 		}
 
 		def _updateAfterChange {
 			_container.calculateSize(_renderer, null, BASE_FONT_SIZE)
 			_container.updateLayout(_originX, _originY)
 			_container.updateAnchorCount
+		}
+
+		def _notifyDelegate {
+			if _delegate != null {
+				_delegate.handleEditorUpdate
+			}
 		}
 	}
 

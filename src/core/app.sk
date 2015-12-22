@@ -11,7 +11,7 @@ enum App.Animation {
 	EASE_IN_OUT
 }
 
-class App :: Platform.Delegate {
+class App :: Platform.Delegate, Layout.Editor.Delegate {
 	var _platform Platform
 	var _canvas Canvas
 	var _editor Layout.Editor
@@ -38,6 +38,7 @@ class App :: Platform.Delegate {
 		_createInitialContent
 		_resetCursorBlink
 		platform.setDelegate(self)
+		_editor.setDelegate(self)
 	}
 
 	def _createInitialContent {
@@ -166,24 +167,23 @@ class App :: Platform.Delegate {
 		_oldTouches = []
 	}
 
-	def handleKeyCode(key Platform.KeyCode, flags Platform.KeyFlags) {
-		switch key {
-			case .LEFT {
-				_editor.moveByX(-1)
-				_resetCursorBlink
-			}
+	def handleShortcut(shortcut Platform.Shortcut) {
+		switch shortcut {
+			case .MOVE_LEFT_CHARACTER { _editor.move(.LEFT, .CHARACTER) }
+			case .MOVE_RIGHT_CHARACTER { _editor.move(.RIGHT, .CHARACTER) }
 
-			case .RIGHT {
-				_editor.moveByX(1)
-				_resetCursorBlink
-			}
+			case .MOVE_LEFT_LINE { _editor.move(.LEFT, .LINE) }
+			case .MOVE_RIGHT_LINE { _editor.move(.RIGHT, .LINE) }
+
+			case .MOVE_UP { _editor.move(.LEFT, .LINE) }
+			case .MOVE_DOWN { _editor.move(.RIGHT, .LINE) }
+
+			case .DELETE_LEFT_CHARACTER {}
+			case .DELETE_RIGHT_CHARACTER {}
 		}
 	}
 
 	def handleCodePoint(codePoint int, flags Platform.KeyFlags) {
-		if codePoint == '-' { codePoint = '−' }
-		else if codePoint == '*' { codePoint = '·' }
-
 		var c = Layout.Container.new
 		if codePoint == '/' {
 			c.children.append(Layout.Fraction.new)
@@ -191,6 +191,9 @@ class App :: Platform.Delegate {
 			c.children.append(Layout.Character.new(codePoint))
 		}
 		_editor.insert(c)
+	}
+
+	def handleEditorUpdate {
 		_resetCursorBlink
 	}
 

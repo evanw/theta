@@ -6,7 +6,7 @@ interface Platform.Delegate {
 	def handleTouchStart(centerX double, centerY double, averageDistance double)
 	def handleTouchMove(centerX double, centerY double, averageDistance double)
 	def handleTouchEnd(centerX double, centerY double, averageDistance double)
-	def handleKeyCode(key KeyCode, flags KeyFlags)
+	def handleShortcut(shortcut Shortcut)
 	def handleCodePoint(codePoint int, flags KeyFlags)
 }
 
@@ -27,11 +27,19 @@ flags Platform.KeyFlags {
 	SHIFT
 }
 
-enum Platform.KeyCode {
-	BACKSPACE
-	LEFT
-	UP
-	RIGHT
-	DOWN
-	DELETE
+enum Platform.Shortcut {
+	DELETE_LEFT_CHARACTER
+	DELETE_LEFT_LINE
+	DELETE_LEFT_WORD
+	DELETE_RIGHT_CHARACTER
+	DELETE_RIGHT_LINE
+	DELETE_RIGHT_WORD
+	MOVE_DOWN
+	MOVE_LEFT_CHARACTER
+	MOVE_LEFT_LINE
+	MOVE_LEFT_WORD
+	MOVE_RIGHT_CHARACTER
+	MOVE_RIGHT_LINE
+	MOVE_RIGHT_WORD
+	MOVE_UP
 }
