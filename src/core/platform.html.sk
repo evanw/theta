@@ -6,11 +6,21 @@ class HTMLPlatform :: Platform {
 	var _pixelHeight = 0
 	var _context = GPU.HTMLContext.new
 	var _delegate Platform.Delegate = null
+	var _hasFocus = true
 
 	def new {
 		var isOSX = navigator.platform == "MacIntel" || navigator.platform == "MacPPC"
 		var canvas = _context.gl.canvas
 		var centroid = Vector.new
+		var isHidden = false
+		var isBlurred = false
+
+		var handleFocusChange = => {
+			_hasFocus = !isBlurred && !isHidden
+			if _delegate != null {
+				_delegate.handleFocusChange
+			}
+		}
 
 		var resize = => {
 			_width = window.innerWidth
@@ -110,7 +120,7 @@ class HTMLPlatform :: Platform {
 			if hasShortcut {
 				e.preventDefault
 				if _delegate != null {
-					_delegate.handleShortcut(shortcut)
+					_delegate.handleShortcut(shortcut, flagsFromEvent(e))
 				}
 			}
 		})
@@ -129,11 +139,30 @@ class HTMLPlatform :: Platform {
 			}
 		})
 
+		document.addEventListener("visibilitychange", => {
+			isHidden = document.hidden
+			handleFocusChange()
+		})
+
+		window.addEventListener("blur", => {
+			isBlurred = true
+			handleFocusChange()
+		})
+
+		window.addEventListener("focus", => {
+			isBlurred = false
+			handleFocusChange()
+		})
+
 		_context.gl.getExtension("OES_standard_derivatives")
 		window.addEventListener("resize", resize)
 		document.body.appendChild(canvas)
 		resize()
 		tick()
+	}
+
+	def hasFocus bool {
+		return _hasFocus
 	}
 
 	def width int {

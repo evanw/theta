@@ -1,4 +1,4 @@
-class GPU.SmoothRenderer {
+class GPU.Smooth {
 	enum Loop {
 		CLOSED
 		OPEN
@@ -45,21 +45,12 @@ class GPU.SmoothRenderer {
 		}
 	}
 
-	def _loadPoints(rect Rect) {
-		_rectPoints[0].set(rect.left, rect.top)
-		_rectPoints[1].set(rect.right, rect.top)
-		_rectPoints[2].set(rect.right, rect.bottom)
-		_rectPoints[3].set(rect.left, rect.bottom)
-	}
-
-	def fillRect(rect Rect, color Color) {
-		_loadPoints(rect)
+	def fillRect(x double, y double, width double, height double, color Color) {
+		_rectPoints[0].set(x, y)
+		_rectPoints[1].set(x + width, y)
+		_rectPoints[2].set(x + width, y + height)
+		_rectPoints[3].set(x, y + height)
 		fillConvexPolygon(_rectPoints, color)
-	}
-
-	def strokeLine(rect Rect, color Color, thickness double) {
-		_loadPoints(rect)
-		strokeNonOverlappingPolyline(_rectPoints, color, thickness, .CLOSED)
 	}
 
 	def strokeLine(start Vector, end Vector, color Color, thickness double) {
@@ -226,7 +217,7 @@ class GPU.SmoothRenderer {
 	}
 }
 
-namespace GPU.SmoothRenderer {
+namespace GPU.Smooth {
 	const _rectPoints List<Vector> = [Vector.new, Vector.new, Vector.new, Vector.new]
 	const _linePoints List<Vector> = [Vector.new, Vector.new]
 }

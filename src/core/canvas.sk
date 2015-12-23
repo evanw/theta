@@ -8,7 +8,7 @@ class Canvas :: Layout.Renderer {
 	var _platform Platform
 	var _context GPU.Context
 	var _pool GPU.BufferPool
-	var _smooth GPU.SmoothRenderer
+	var _smooth GPU.Smooth
 	var _demoMaterial GPU.Material
 	var _glyphMaterial GPU.Material
 	var _textMaterial GPU.Material
@@ -33,7 +33,7 @@ class Canvas :: Layout.Renderer {
 		_platform = platform
 		_context = platform.context
 		_pool = GPU.BufferPool.new(_context)
-		_smooth = GPU.SmoothRenderer.new(_context, _pool)
+		_smooth = GPU.Smooth.new(_context, _pool)
 		_demoMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_DEMO_VERTEX, GLSLX_SOURCE_DEMO_FRAGMENT)
 		_glyphMaterial = _context.createMaterial(Glyph.VERTEX_FORMAT, GLSLX_SOURCE_GLYPH_VERTEX, GLSLX_SOURCE_GLYPH_FRAGMENT)
 		_textMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_TEXT_VERTEX, GLSLX_SOURCE_TEXT_FRAGMENT)
@@ -110,6 +110,14 @@ class Canvas :: Layout.Renderer {
 		_smooth.strokeLine(ax, ay, bx, by, .BLACK, 1)
 	}
 
+	def addSelectionBox(x double, y double, width double, height double) {
+		_smooth.fillRect(x, y, width, height, SELECTION_COLOR)
+	}
+
+	def lineHeight double {
+		return _font.ascender - _font.descender
+	}
+
 	def measureGlyph(codePoint int) double {
 		return _font.glyph(codePoint).advanceWidth
 	}
@@ -153,13 +161,13 @@ class Canvas :: Layout.Renderer {
 		# Horizontal axis
 		for x in left..right {
 			var tx = origin.x + x * scale / step
-			_smooth.strokeLine(tx, 0, tx, height, x == 0 ? .BLACK : x % 10 == 0 ? GRID_DARK : GRID_LIGHT, x == 0 ? 2 : 1)
+			_smooth.strokeLine(tx, 0, tx, height, x == 0 ? .BLACK : x % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, x == 0 ? 2 : 1)
 		}
 
 		# Vertical axis
 		for y in top..bottom {
 			var ty = origin.y + y * scale / step
-			_smooth.strokeLine(0, ty, width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK : GRID_LIGHT, y == 0 ? 2 : 1)
+			_smooth.strokeLine(0, ty, width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, y == 0 ? 2 : 1)
 		}
 
 		# Coordinate text and tick marks
@@ -259,54 +267,29 @@ class Canvas :: Layout.Renderer {
 namespace Canvas {
 	const GRID_FONT_SIZE = 16
 	const GRID_TICK_SIZE = 5
-	const GRID_LIGHT = Color.new(0, 0, 0, 31)
-	const GRID_DARK = Color.new(0, 0, 0, 127)
+	const SELECTION_COLOR = Color.new(0, 127, 255, 63)
+	const GRID_LIGHT_COLOR = Color.new(0, 0, 0, 31)
+	const GRID_DARK_COLOR = Color.new(0, 0, 0, 127)
 	const QUAD_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
 
-	if true {
-		# 6x subpixel AA pattern
-		#
-		#   R = (f(x - 2/3, y) + f(x - 1/3, y) + f(x, y)) / 3
-		#   G = (f(x - 1/3, y) + f(x, y) + f(x + 1/3, y)) / 3
-		#   B = (f(x, y) + f(x + 1/3, y) + f(x + 2/3, y)) / 3
-		#
-		# The shader would require three texture lookups if the texture format
-		# stored data for offsets -1/3, 0, and +1/3 since the shader also needs
-		# data for offsets -2/3 and +2/3. To avoid this, the texture format stores
-		# data for offsets 0, +1/3, and +2/3 instead. That way the shader can get
-		# data for offsets -2/3 and -1/3 with only one additional texture lookup.
-		#
-		const JITTER_PATTERN = [
-			Vector.new(-1 / 12.0, -5 / 12.0),
-			Vector.new( 1 / 12.0,  1 / 12.0),
-			Vector.new( 3 / 12.0, -1 / 12.0),
-			Vector.new( 5 / 12.0,  5 / 12.0),
-			Vector.new( 7 / 12.0, -3 / 12.0),
-			Vector.new( 9 / 12.0,  3 / 12.0),
-		]
-	}
-
-	else if true {
-		# 8x MSAA pattern
-		const JITTER_PATTERN = [
-			Vector.new(-3 / 16.0, -5 / 16.0),
-			Vector.new( 5 / 16.0,  1 / 16.0),
-			Vector.new(-1 / 16.0,  3 / 16.0),
-			Vector.new( 7 / 16.0, -7 / 16.0),
-			Vector.new( 1 / 16.0, -3 / 16.0),
-			Vector.new(-5 / 16.0,  5 / 16.0),
-			Vector.new( 3 / 16.0,  7 / 16.0),
-			Vector.new(-7 / 16.0, -1 / 16.0),
-		]
-	}
-
-	else {
-		# 4x MSAA pattern
-		const JITTER_PATTERN = [
-			Vector.new( 1 / 8.0,  3 / 8.0),
-			Vector.new(-1 / 8.0, -3 / 8.0),
-			Vector.new( 3 / 8.0, -1 / 8.0),
-			Vector.new(-3 / 8.0,  1 / 8.0),
-		]
-	}
+	# 6x subpixel AA pattern
+	#
+	#   R = (f(x - 2/3, y) + f(x - 1/3, y) + f(x, y)) / 3
+	#   G = (f(x - 1/3, y) + f(x, y) + f(x + 1/3, y)) / 3
+	#   B = (f(x, y) + f(x + 1/3, y) + f(x + 2/3, y)) / 3
+	#
+	# The shader would require three texture lookups if the texture format
+	# stored data for offsets -1/3, 0, and +1/3 since the shader also needs
+	# data for offsets -2/3 and +2/3. To avoid this, the texture format stores
+	# data for offsets 0, +1/3, and +2/3 instead. That way the shader can get
+	# data for offsets -2/3 and -1/3 with only one additional texture lookup.
+	#
+	const JITTER_PATTERN = [
+		Vector.new(-1 / 12.0, -5 / 12.0),
+		Vector.new( 1 / 12.0,  1 / 12.0),
+		Vector.new( 3 / 12.0, -1 / 12.0),
+		Vector.new( 5 / 12.0,  5 / 12.0),
+		Vector.new( 7 / 12.0, -3 / 12.0),
+		Vector.new( 9 / 12.0,  3 / 12.0),
+	]
 }

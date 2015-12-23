@@ -6,19 +6,9 @@ interface Platform.Delegate {
 	def handleTouchStart(centerX double, centerY double, averageDistance double)
 	def handleTouchMove(centerX double, centerY double, averageDistance double)
 	def handleTouchEnd(centerX double, centerY double, averageDistance double)
-	def handleShortcut(shortcut Shortcut)
+	def handleShortcut(shortcut Shortcut, flags KeyFlags)
 	def handleCodePoint(codePoint int, flags KeyFlags)
-}
-
-interface Platform {
-	def width int
-	def height int
-	def density double
-	def pixelWidth int
-	def pixelHeight int
-	def seconds double
-	def context GPU.Context
-	def setDelegate(delegate Delegate)
+	def handleFocusChange
 }
 
 flags Platform.KeyFlags {
@@ -34,6 +24,7 @@ enum Platform.Shortcut {
 	DELETE_RIGHT_CHARACTER
 	DELETE_RIGHT_LINE
 	DELETE_RIGHT_WORD
+
 	MOVE_DOWN
 	MOVE_LEFT_CHARACTER
 	MOVE_LEFT_LINE
@@ -42,4 +33,16 @@ enum Platform.Shortcut {
 	MOVE_RIGHT_LINE
 	MOVE_RIGHT_WORD
 	MOVE_UP
+}
+
+interface Platform {
+	def hasFocus bool
+	def width int
+	def height int
+	def density double
+	def pixelWidth int
+	def pixelHeight int
+	def seconds double
+	def context GPU.Context
+	def setDelegate(delegate Delegate)
 }
