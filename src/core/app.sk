@@ -19,7 +19,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	var _cursorToggleTime = 0.0
 	var _isCursorVisible = true
 	var _isInvalid = true
-	var _validFrames = 0
+	var _idleFrames = 0
 	var _oldTouches List<OldTouch> = []
 
 	# Animation support
@@ -81,22 +81,28 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 			_invalidate
 		}
 
+		# Cursor invalidations don't count as user activity
+		var shouldResetIdleFrames = _isInvalid
+
 		# Toggle the cursor periodically
 		if _platform.hasFocus && time > _cursorToggleTime {
 			_cursorToggleTime = time + CURSOR_BLINK_DELAY
 			_isCursorVisible = !_isCursorVisible
+			_invalidate
 		}
 
 		# Always draw immediately when invalid
 		if _isInvalid {
-			_validFrames = 0
+			if shouldResetIdleFrames {
+				_idleFrames = 0
+			}
 			_isInvalid = false
 			_draw
 		}
 
-		# Render occasionally even when valid. Chrome must render at least 10fps to
+		# Render occasionally even when idle. Chrome must render at least 10fps to
 		# avoid stutter when starting to render at 60fps again.
-		else if _platform.hasFocus && _validFrames % 6 == 0 {
+		else if _platform.hasFocus && ++_idleFrames % 6 == 0 && _idleFrames < 60 * 2 {
 			_draw
 		}
 	}
@@ -168,7 +174,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	}
 
 	def handleShortcut(shortcut Platform.Shortcut, flags Platform.KeyFlags) {
-		var selection Layout.Selection = .SHIFT in flags ? .EXTEND : .RESET
+		var selection Layout.Behavior = .SHIFT in flags ? .EXTEND : .RESET
 
 		switch shortcut {
 			case .MOVE_LEFT_CHARACTER { _editor.move(.LEFT, .CHARACTER, selection) }
