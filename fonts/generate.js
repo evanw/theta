@@ -99,7 +99,7 @@ function process(options) {
 			var glyph = font.charToGlyph(char);
 			var path = glyph.getPath(0, 0, 1);
 			var codePoint = char.charCodeAt(0);
-			if (codePoint !== glyph.unicode) {
+			if (codePoint !== glyph.unicode && glyph.unicode !== void 0) {
 				throw new Error('Font "' + input.path + '" is missing character "' + char + '"');
 			}
 			glyphs.push({
@@ -154,7 +154,7 @@ function main() {
 				chars:
 					'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' +
 					'0123456789' +
-					'+−·÷=<>≤≥,.! ',
+					'+−·÷=<>≤≥,.! \0',
 					// ⁄×√∫≠∏∑
 			},
 		],

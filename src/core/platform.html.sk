@@ -43,6 +43,8 @@ class HTMLPlatform :: Platform {
 		var shortcutMap IntMap<Platform.Shortcut> = {
 			_shortcut(KEY_BACKSPACE, 0): .DELETE_LEFT_CHARACTER,
 			_shortcut(KEY_DELETE, 0): .DELETE_RIGHT_CHARACTER,
+			_shortcut(KEY_BACKSPACE, .SHIFT): .DELETE_LEFT_CHARACTER,
+			_shortcut(KEY_DELETE, .SHIFT): .DELETE_RIGHT_CHARACTER,
 
 			_shortcut(KEY_LEFT, 0): .MOVE_LEFT_CHARACTER,
 			_shortcut(KEY_RIGHT, 0): .MOVE_RIGHT_CHARACTER,
@@ -161,7 +163,8 @@ class HTMLPlatform :: Platform {
 				code >= '0' && code <= '9' || code == '.' ||
 				code == '+' || code == '-' || code == '*' || code == '/' || code == '÷' ||
 				code == '<' || code == '>' || code == '≤' || code == '≥' || code == '=' ||
-				code == '^' || code == '_' || code == ','
+				code == '(' || code == ')' || code == '[' || code == ']' || code == '{' || code == '}' ||
+				code == '^' || code == '_' || code == ',' || code == '!'
 			) {
 				_delegate.handleCodePoint(code)
 			}

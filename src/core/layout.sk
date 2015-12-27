@@ -161,11 +161,13 @@ namespace Layout {
 		}
 
 		def changeAnchor(both Anchor) {
+			assert(both.element == _root)
 			assert(0 <= both.relativeIndex && both.relativeIndex < _root.anchorCount)
 			_start = _end = both
 		}
 
 		def changeAnchors(start Anchor, end Anchor) {
+			assert(start.element == _root && end.element == _root)
 			assert(0 <= start.relativeIndex && start.relativeIndex < _root.anchorCount)
 			assert(0 <= end.relativeIndex && end.relativeIndex < _root.anchorCount)
 			_start = start
@@ -282,7 +284,7 @@ namespace Layout {
 	################################################################################
 
 	class Character : Element {
-		var codePoint int
+		const codePoint int
 		var paddingLeft = 0.0
 		var fontSize = 0.0
 
@@ -315,7 +317,7 @@ namespace Layout {
 			}
 
 			# Add space on both sides of the glyph
-			else if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && previous != null {
+			else if codePoint in CODE_POINTS_WITH_SPACES || _isTermSeparator(previous) {
 				paddingLeft = renderer.measureGlyph(' ') * parentFontSize
 				box.width += paddingLeft * 2
 			}
@@ -337,6 +339,17 @@ namespace Layout {
 			if codePoint == '-' { return '−' }
 			if codePoint == '*' { return '·' }
 			return codePoint
+		}
+
+		def _isTermSeparator(previous Element) bool {
+			if codePoint != '+' && codePoint != '-' || previous == null {
+				return false
+			}
+			if previous is Character {
+				var c = (previous as Character).codePoint
+				return c != '+' && c != '-' && c != '*' && c != '÷'
+			}
+			return true
 		}
 	}
 
@@ -384,10 +397,11 @@ namespace Layout {
 
 				# Check inside the child
 				var child = children[i]
-				if relativeIndex < child.anchorCount {
+				var count = child.anchorCount
+				if relativeIndex < count {
 					return Anchor.new(self, index, i, child.anchorAt(relativeIndex))
 				}
-				relativeIndex -= child.anchorCount
+				relativeIndex -= count
 			}
 
 			# Must be after all children
@@ -631,6 +645,63 @@ namespace Layout {
 			return _selection.extractSelection
 		}
 
+		def _applySubstitutions(container Container, indexBase int) {
+			var children = container.children
+			var childIndexBase = indexBase
+			var i = 0
+
+			# Move over all children, mutating the sequence with character substitutions
+			while i < children.count {
+				var child = children[i]
+
+				# Character elements
+				if child is Character {
+					var text = ""
+					for j in i..children.count {
+						var sibling = children[j]
+						if !(sibling is Character) {
+							break
+						}
+						text += string.fromCodePoint((sibling as Character).codePoint)
+
+						# Substitute matching characters
+						if text in SUBSTITUTIONS {
+							children.removeRange(i, j + 1)
+							child = Character.new(SUBSTITUTIONS[text])
+							children.insert(i, child)
+							var start = _selection.start.relativeIndex - childIndexBase
+							var end = _selection.end.relativeIndex - childIndexBase
+							if start > 0 {
+								start = Math.max(1, start + i - j)
+							}
+							if end > 0 {
+								end = Math.max(1, end + i - j)
+							}
+							_selection.changeAnchors(_root.anchorAt(childIndexBase + start), _root.anchorAt(childIndexBase + end))
+							break
+						}
+					}
+				}
+
+				# Special elements
+				else if child is Special {
+					var nestedIndexBase = childIndexBase + 1
+					for nested in (child as Special).children {
+						_applySubstitutions(nested, nestedIndexBase)
+						nestedIndexBase += nested.anchorCount
+					}
+				}
+
+				else {
+					assert(false)
+				}
+
+				# Move to the next child
+				childIndexBase += 1 + child.anchorCount
+				i++
+			}
+		}
+
 		def move(direction Direction, boundary Boundary, behavior Behavior) {
 			_selection.move(direction, boundary, behavior)
 			_notifyDelegate(.SELECTION)
@@ -653,8 +724,9 @@ namespace Layout {
 				var clone = container.clone as Container
 				var anchor = _selection.start.deepestAnchor
 				anchor.containerElement.children.insert(anchor.internalIndex, clone.children)
-				_updateLayout
 				_selection.changeAnchor(_root.anchorAt(_selection.start.relativeIndex + clone.anchorCount - 1))
+				_applySubstitutions(_root, 0)
+				_updateLayout
 				_notifyDelegate(.CONTENTS)
 			}
 		}
@@ -668,6 +740,59 @@ namespace Layout {
 			if _delegate != null {
 				_delegate.handleEditorChange(change)
 			}
+		}
+	}
+
+	namespace Editor {
+		const SUBSTITUTIONS = {
+			"Alpha": 'Α',
+			"alpha": 'α',
+			"Beta": 'Β',
+			"beta": 'β',
+			"Chi": 'Χ',
+			"chi": 'χ',
+			"Delta": 'Δ',
+			"delta": 'δ',
+			"Epsilon": 'Ε',
+			"epsilon": 'ε',
+			"Eta": 'Η',
+			"eta": 'η',
+			"Gamma": 'Γ',
+			"gamma": 'γ',
+			"Iota": 'Ι',
+			"iota": 'ι',
+			"Kappa": 'Κ',
+			"kappa": 'κ',
+			"Lambda": 'Λ',
+			"lambda": 'λ',
+			"Mu": 'Μ',
+			"mu": 'μ',
+			"Nu": 'Ν',
+			"nu": 'ν',
+			"Omega": 'Ω',
+			"omega": 'ω',
+			"Omicron": 'Ο',
+			"omicron": 'ο',
+			"Phi": 'Φ',
+			"phi": 'φ',
+			"Pi": 'Π',
+			"pi": 'π',
+			"Psi": 'Ψ',
+			"psi": 'ψ',
+			"Rho": 'Ρ',
+			"rho": 'ρ',
+			"Sigma": 'Σ',
+			"sigma": 'σ',
+			"Tau": 'Τ',
+			"tau": 'τ',
+			"Theta": 'Θ',
+			"theta": 'θ',
+			"Upsilon": 'Υ',
+			"upsilon": 'υ',
+			"Xi": 'Ξ',
+			"xi": 'ξ',
+			"Zeta": 'Ζ',
+			"zeta": 'ζ',
 		}
 	}
 }
