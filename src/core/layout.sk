@@ -648,6 +648,7 @@ namespace Layout {
 		def _applySubstitutions(container Container, indexBase int) {
 			var children = container.children
 			var childIndexBase = indexBase
+			var skipCount = 0
 			var i = 0
 
 			# Move over all children, mutating the sequence with character substitutions
@@ -655,7 +656,7 @@ namespace Layout {
 				var child = children[i]
 
 				# Character elements
-				if child is Character {
+				if child is Character && --skipCount < 0 {
 					var text = ""
 					for j in i..children.count {
 						var sibling = children[j]
@@ -663,11 +664,17 @@ namespace Layout {
 							break
 						}
 						text += string.fromCodePoint((sibling as Character).codePoint)
+						var codePoint = SUBSTITUTIONS.get(text, INVALID_SUBSTITUTION)
+
+						# Prevent substitutions inside incomplete words
+						if codePoint == SKIP_SUBSTITUTION {
+							skipCount = j - i
+						}
 
 						# Substitute matching characters
-						if text in SUBSTITUTIONS {
+						else if codePoint != INVALID_SUBSTITUTION {
 							children.removeRange(i, j + 1)
-							child = Character.new(SUBSTITUTIONS[text])
+							child = Character.new(codePoint)
 							children.insert(i, child)
 							var start = _selection.start.relativeIndex - childIndexBase
 							var end = _selection.end.relativeIndex - childIndexBase
@@ -678,6 +685,7 @@ namespace Layout {
 								end = Math.max(1, end + i - j)
 							}
 							_selection.changeAnchors(_root.anchorAt(childIndexBase + start), _root.anchorAt(childIndexBase + end))
+							skipCount = 0
 							break
 						}
 					}
@@ -690,10 +698,6 @@ namespace Layout {
 						_applySubstitutions(nested, nestedIndexBase)
 						nestedIndexBase += nested.anchorCount
 					}
-				}
-
-				else {
-					assert(false)
 				}
 
 				# Move to the next child
@@ -744,6 +748,8 @@ namespace Layout {
 	}
 
 	namespace Editor {
+		const INVALID_SUBSTITUTION = -1
+		const SKIP_SUBSTITUTION = 0
 		const SUBSTITUTIONS = {
 			"Alpha": 'Α',
 			"alpha": 'α',
@@ -793,6 +799,12 @@ namespace Layout {
 			"xi": 'ξ',
 			"Zeta": 'Ζ',
 			"zeta": 'ζ',
+
+			# Prevent substitutions inside incomplete words
+			"Epsi": SKIP_SUBSTITUTION,
+			"epsi": SKIP_SUBSTITUTION,
+			"Upsi": SKIP_SUBSTITUTION,
+			"upsi": SKIP_SUBSTITUTION,
 		}
 	}
 }
