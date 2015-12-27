@@ -85,7 +85,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		var shouldResetIdleFrames = _isInvalid
 
 		# Toggle the cursor periodically
-		if _platform.hasFocus && time > _cursorToggleTime {
+		if _platform.hasFocus && time > _cursorToggleTime && !_editor.hasSelection {
 			_cursorToggleTime = time + CURSOR_BLINK_DELAY
 			_isCursorVisible = !_isCursorVisible
 			_invalidate
@@ -173,25 +173,40 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_oldTouches = []
 	}
 
-	def handleShortcut(shortcut Platform.Shortcut, flags Platform.KeyFlags) {
-		var selection Layout.Behavior = .SHIFT in flags ? .EXTEND : .RESET
-
+	def handleShortcut(shortcut Platform.Shortcut) {
 		switch shortcut {
-			case .MOVE_LEFT_CHARACTER { _editor.move(.LEFT, .CHARACTER, selection) }
-			case .MOVE_RIGHT_CHARACTER { _editor.move(.RIGHT, .CHARACTER, selection) }
+			case .SELECT_ALL { _editor.selectAll }
 
-			case .MOVE_LEFT_LINE { _editor.move(.LEFT, .LINE, selection) }
-			case .MOVE_RIGHT_LINE { _editor.move(.RIGHT, .LINE, selection) }
+			case .MOVE_LEFT_CHARACTER { _editor.move(.LEFT, .CHARACTER, .RESET) }
+			case .MOVE_RIGHT_CHARACTER { _editor.move(.RIGHT, .CHARACTER, .RESET) }
 
-			case .MOVE_UP { _editor.move(.LEFT, .LINE, selection) }
-			case .MOVE_DOWN { _editor.move(.RIGHT, .LINE, selection) }
+			case .MOVE_LEFT_LINE { _editor.move(.LEFT, .LINE, .RESET) }
+			case .MOVE_RIGHT_LINE { _editor.move(.RIGHT, .LINE, .RESET) }
+
+			case .MOVE_UP { _editor.move(.LEFT, .LINE, .RESET) }
+			case .MOVE_DOWN { _editor.move(.RIGHT, .LINE, .RESET) }
+
+			case .EXTEND_LEFT_CHARACTER { _editor.move(.LEFT, .CHARACTER, .EXTEND) }
+			case .EXTEND_RIGHT_CHARACTER { _editor.move(.RIGHT, .CHARACTER, .EXTEND) }
+
+			case .EXTEND_LEFT_LINE { _editor.move(.LEFT, .LINE, .EXTEND) }
+			case .EXTEND_RIGHT_LINE { _editor.move(.RIGHT, .LINE, .EXTEND) }
+
+			case .EXTEND_UP { _editor.move(.LEFT, .LINE, .EXTEND) }
+			case .EXTEND_DOWN { _editor.move(.RIGHT, .LINE, .EXTEND) }
 
 			case .DELETE_LEFT_CHARACTER { _editor.delete(.LEFT, .CHARACTER) }
 			case .DELETE_RIGHT_CHARACTER { _editor.delete(.RIGHT, .CHARACTER) }
+
+			case .DELETE_LEFT_WORD { _editor.delete(.LEFT, .WORD) }
+			case .DELETE_RIGHT_WORD { _editor.delete(.RIGHT, .WORD) }
+
+			case .DELETE_LEFT_LINE { _editor.delete(.LEFT, .LINE) }
+			case .DELETE_RIGHT_LINE { _editor.delete(.RIGHT, .LINE) }
 		}
 	}
 
-	def handleCodePoint(codePoint int, flags Platform.KeyFlags) {
+	def handleCodePoint(codePoint int) {
 		var c = Layout.Container.new
 		if codePoint == '/' {
 			c.children.append(Layout.Fraction.new)

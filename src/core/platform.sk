@@ -6,24 +6,34 @@ interface Platform.Delegate {
 	def handleTouchStart(centerX double, centerY double, averageDistance double)
 	def handleTouchMove(centerX double, centerY double, averageDistance double)
 	def handleTouchEnd(centerX double, centerY double, averageDistance double)
-	def handleShortcut(shortcut Shortcut, flags KeyFlags)
-	def handleCodePoint(codePoint int, flags KeyFlags)
+	def handleShortcut(shortcut Shortcut)
+	def handleCodePoint(codePoint int)
 	def handleFocusChange
 }
 
-flags Platform.KeyFlags {
-	ALT
-	META
-	SHIFT
-}
-
 enum Platform.Shortcut {
+	CUT
+	COPY
+	PASTE
+	SELECT_ALL
+	UNDO
+	REDO
+
 	DELETE_LEFT_CHARACTER
 	DELETE_LEFT_LINE
 	DELETE_LEFT_WORD
 	DELETE_RIGHT_CHARACTER
 	DELETE_RIGHT_LINE
 	DELETE_RIGHT_WORD
+
+	EXTEND_DOWN
+	EXTEND_LEFT_CHARACTER
+	EXTEND_LEFT_LINE
+	EXTEND_LEFT_WORD
+	EXTEND_RIGHT_CHARACTER
+	EXTEND_RIGHT_LINE
+	EXTEND_RIGHT_WORD
+	EXTEND_UP
 
 	MOVE_DOWN
 	MOVE_LEFT_CHARACTER

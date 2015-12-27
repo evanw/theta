@@ -144,10 +144,6 @@ namespace Layout {
 
 			if !isEmpty {
 				_renderRange(renderer, expandedRange)
-
-				# TODO: REMOVE THIS
-				_renderAnchor(renderer, _start)
-				_renderAnchor(renderer, _end)
 			} else if cursor == .SHOW_CURSOR {
 				_renderAnchor(renderer, _start)
 			}
@@ -166,37 +162,50 @@ namespace Layout {
 		}
 
 		def move(direction Direction, boundary Boundary, behavior Behavior) {
-			# If the range isn't empty, just collapse the range to one side
-			if behavior == .RESET && !isEmpty {
-				var range = expandedRange
-				_start = _end = direction == .LEFT ? range.min : range.max
-				return
-			}
+			var originalRange = expandedRange
+			var current = _start
 
-			# Move the start of the range
-			switch boundary {
-				case .CHARACTER {
-					_start = _root.anchorAt(direction == .LEFT
-						? Math.max(_start.relativeIndex - 1, 0)
-						: Math.min(_start.relativeIndex + 1, _root.anchorCount - 1))
-				}
-
-				case .WORD {
-				}
-
-				case .LINE {
-					_start = _root.anchorAt(direction == .LEFT ? 0 : _root.anchorCount - 1)
-				}
-			}
-
-			# Collapse the range when not extending it
 			if behavior == .RESET {
-				_end = _start
+				_start = _end = isEmpty
+					? _move(_root, current, direction, boundary)
+					: direction == .LEFT ? originalRange.min : originalRange.max
+			}
+
+			else {
+				assert(behavior == .EXTEND)
+
+				while true {
+					var next = _move(_root, current, direction, boundary)
+					if next.relativeIndex == current.relativeIndex {
+						break
+					}
+					current = next
+
+					var range = Range.new(_root, current, _end).expandedRange
+					if range.start.relativeIndex != originalRange.start.relativeIndex ||
+							range.end.relativeIndex != originalRange.end.relativeIndex {
+						break
+					}
+				}
+
+				_start = current
 			}
 		}
 	}
 
 	namespace Range {
+		def _move(root Container, anchor Anchor, direction Direction, boundary Boundary) Anchor {
+			var moved = root.anchorAt(Math.clamp(anchor.relativeIndex + direction.delta, 0, root.anchorCount - 1))
+
+			if boundary == .LINE {
+				var range = Range.new(root, anchor, moved).expandedRange
+				var deepest = range.start.deepestAnchor
+				moved = root.anchorAt(range.start.relativeIndex - deepest.relativeIndex + (direction == .LEFT ? 0 : deepest.containerElement.anchorCount - 1))
+			}
+
+			return moved
+		}
+
 		def _renderRange(renderer Renderer, range Range) {
 			var start = range.start.deepestAnchor
 			var end = range.end.deepestAnchor
@@ -478,6 +487,10 @@ namespace Layout {
 			_selection = Range.new(_root, _root.anchorAt(0), _root.anchorAt(0))
 		}
 
+		def hasSelection bool {
+			return !_selection.isEmpty
+		}
+
 		def setDelegate(delegate Delegate) {
 			_delegate = delegate
 		}
@@ -485,6 +498,11 @@ namespace Layout {
 		def render(cursor Cursor) {
 			_root.render(_renderer)
 			_selection.render(_renderer, cursor)
+		}
+
+		def selectAll {
+			_selection.changeAnchors(_root.anchorAt(0), _root.anchorAt(_root.anchorCount - 1))
+			_notifyDelegate
 		}
 
 		def move(direction Direction, boundary Boundary, behavior Behavior) {
