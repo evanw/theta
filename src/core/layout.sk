@@ -263,6 +263,11 @@ namespace Layout {
 		def render(renderer Renderer)
 	}
 
+	namespace Element {
+		const BASE_FONT_SIZE = 28
+		const MIN_FONT_SIZE = 16
+	}
+
 	################################################################################
 
 	class Character : Element {
@@ -304,7 +309,8 @@ namespace Layout {
 				box.width += paddingLeft * 2
 			}
 
-			box.upperHeight = box.lowerHeight = renderer.lineHeight * parentFontSize / 2
+			box.upperHeight = renderer.lineHeight * parentFontSize * 0.6
+			box.lowerHeight = renderer.lineHeight * parentFontSize * 0.4
 		}
 
 		over updateLayout(x double, y double) {
@@ -444,24 +450,25 @@ namespace Layout {
 		}
 
 		over calculateSize(renderer Renderer, parent Container, parentFontSize double) {
+			parentFontSize = Math.max(Element.MIN_FONT_SIZE, parentFontSize * 0.8)
 			top.calculateSize(renderer, null, parentFontSize)
 			bottom.calculateSize(renderer, null, parentFontSize)
 			box.width = Math.max(top.box.width, bottom.box.width) + 8
 			box.upperHeight = top.box.height + 2
-			box.lowerHeight = bottom.box.height + 4
+			box.lowerHeight = bottom.box.height + 2
 		}
 
 		over updateLayout(x double, y double) {
 			box.x = x
 			box.y = y
 			top.updateLayout(x + (box.width - top.box.width) / 2, y)
-			bottom.updateLayout(x + (box.width - bottom.box.width) / 2, y + box.upperHeight + 4)
+			bottom.updateLayout(x + (box.width - bottom.box.width) / 2, y + box.upperHeight)
 		}
 
 		over render(renderer Renderer) {
 			top.render(renderer)
 			bottom.render(renderer)
-			renderer.addLine(box.x + 2, box.y + box.upperHeight + 4, box.x + box.width - 2, box.y + box.upperHeight + 4)
+			renderer.addLine(box.x + 2, box.y + box.upperHeight, box.x + box.width - 2, box.y + box.upperHeight)
 		}
 	}
 
@@ -534,7 +541,7 @@ namespace Layout {
 		}
 
 		def _updateLayout {
-			_root.calculateSize(_renderer, null, BASE_FONT_SIZE)
+			_root.calculateSize(_renderer, null, Element.BASE_FONT_SIZE)
 			_root.updateLayout(_originX, _originY)
 		}
 
@@ -543,9 +550,5 @@ namespace Layout {
 				_delegate.handleEditorUpdate
 			}
 		}
-	}
-
-	namespace Editor {
-		const BASE_FONT_SIZE = 28
 	}
 }
