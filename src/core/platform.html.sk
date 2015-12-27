@@ -156,10 +156,12 @@ class HTMLPlatform :: Platform {
 			if _delegate != null && (
 				code >= 'a' && code <= 'z' ||
 				code >= 'A' && code <= 'Z' ||
+				code >= 'α' && code <= 'ω' ||
+				code >= 'Α' && code <= 'Ω' ||
 				code >= '0' && code <= '9' || code == '.' ||
 				code == '+' || code == '-' || code == '*' || code == '/' || code == '÷' ||
 				code == '<' || code == '>' || code == '≤' || code == '≥' || code == '=' ||
-				code == ','
+				code == '^' || code == '_' || code == ','
 			) {
 				_delegate.handleCodePoint(code)
 			}

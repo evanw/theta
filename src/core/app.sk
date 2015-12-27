@@ -212,12 +212,31 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 
 	def handleCodePoint(codePoint int) {
 		var c = Layout.Container.new
+
 		if codePoint == '/' {
-			c.children.append(Layout.Fraction.new)
-		} else {
-			c.children.append(Layout.Character.new(codePoint))
+			var special = Layout.Special.new(.FRACTION)
+			special.first.children.append(_editor.copy.children)
+			c.children.append(special)
+			_editor.insert(c)
+			_editor.move(.LEFT, .CHARACTER, .RESET)
+			if special.first.children.isEmpty {
+				_editor.move(.LEFT, .CHARACTER, .RESET)
+			}
 		}
-		_editor.insert(c)
+
+		else if codePoint == '^' || codePoint == '_' {
+			c.children.append(Layout.Special.new(.OVER_UNDER))
+			_editor.insert(c)
+			_editor.move(.LEFT, .CHARACTER, .RESET)
+			if codePoint == '^' {
+				_editor.move(.LEFT, .CHARACTER, .RESET)
+			}
+		}
+
+		else {
+			c.children.append(Layout.Character.new(codePoint))
+			_editor.insert(c)
+		}
 	}
 
 	def handleFocusChange {

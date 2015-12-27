@@ -269,7 +269,7 @@ namespace Layout {
 		def anchorCount int
 		def anchorCountBefore(index int) int
 		def anchorAt(index int) Anchor
-		def calculateSize(renderer Renderer, parent Container, parentFontSize double)
+		def calculateSize(renderer Renderer, previous Element, parentFontSize double)
 		def updateLayout(x double, y double)
 		def render(renderer Renderer)
 	}
@@ -304,7 +304,7 @@ namespace Layout {
 			return null
 		}
 
-		over calculateSize(renderer Renderer, parent Container, parentFontSize double) {
+		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
 			box.width = renderer.measureGlyph(codePointWithSubstitution) * parentFontSize
 			paddingLeft = 0
 			fontSize = parentFontSize
@@ -315,7 +315,7 @@ namespace Layout {
 			}
 
 			# Add space on both sides of the glyph
-			else if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && self != parent.children.first {
+			else if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && previous != null {
 				paddingLeft = renderer.measureGlyph(' ') * parentFontSize
 				box.width += paddingLeft * 2
 			}
@@ -390,17 +390,19 @@ namespace Layout {
 			return Anchor.new(self, index, children.count, null)
 		}
 
-		over calculateSize(renderer Renderer, parent Container, parentFontSize double) {
+		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
 			box.width = 0
 			box.upperHeight = 0
 			box.lowerHeight = 0
 
 			# Stack children up horizontally
+			previous = null
 			for child in children {
-				child.calculateSize(renderer, self, parentFontSize)
+				child.calculateSize(renderer, previous, parentFontSize)
 				box.width += child.box.width
 				box.upperHeight = Math.max(box.upperHeight, child.box.upperHeight)
 				box.lowerHeight = Math.max(box.lowerHeight, child.box.lowerHeight)
+				previous = child
 			}
 
 			# If the container is empty, leave some height for the cursor
@@ -430,57 +432,94 @@ namespace Layout {
 
 	################################################################################
 
-	class Fraction : Element {
-		var top = Container.new
-		var bottom = Container.new
+	enum Special.Kind {
+		FRACTION
+		OVER_UNDER
+	}
+
+	class Special : Element {
+		const kind Kind
+		const first = Container.new
+		const second = Container.new
 
 		over clone Element {
-			var clone = new
-			clone.top = top.clone as Container
-			clone.bottom = bottom.clone as Container
+			var clone = new(kind)
+			clone.first.children.append((first.clone as Container).children)
+			clone.second.children.append((second.clone as Container).children)
 			return clone
 		}
 
 		over anchorCount int {
-			return top.anchorCount + bottom.anchorCount
+			return first.anchorCount + second.anchorCount
 		}
 
 		over anchorCountBefore(index int) int {
 			assert(index == 0 || index == 1)
-			return index == 0 ? 0 : top.anchorCount
+			return index == 0 ? 0 : first.anchorCount
 		}
 
 		over anchorAt(index int) Anchor {
 			assert(index >= 0 && index < anchorCount)
-			var bottomIndex = index - top.anchorCount
-			if bottomIndex < 0 {
-				return Anchor.new(self, index, 0, top.anchorAt(index))
-			} else {
-				return Anchor.new(self, index, 1, bottom.anchorAt(bottomIndex))
-			}
+			var secondIndex = index - first.anchorCount
+			return secondIndex < 0
+				? Anchor.new(self, index, 0, first.anchorAt(index))
+				: Anchor.new(self, index, 1, second.anchorAt(secondIndex))
 		}
 
-		over calculateSize(renderer Renderer, parent Container, parentFontSize double) {
-			parentFontSize = Math.max(Element.MIN_FONT_SIZE, parentFontSize * 0.8)
-			top.calculateSize(renderer, null, parentFontSize)
-			bottom.calculateSize(renderer, null, parentFontSize)
-			box.width = Math.max(top.box.width, bottom.box.width) + 8
-			box.upperHeight = top.box.height + 2
-			box.lowerHeight = bottom.box.height + 2
+		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
+			switch kind {
+				case .FRACTION {
+					parentFontSize = Math.max(Element.MIN_FONT_SIZE, parentFontSize * FRACTION_FONT_RATIO)
+					first.calculateSize(renderer, null, parentFontSize)
+					second.calculateSize(renderer, null, parentFontSize)
+					box.width = Math.max(first.box.width, second.box.width) + 8
+					box.upperHeight = first.box.height + 2
+					box.lowerHeight = second.box.height + 2
+				}
+
+				case .OVER_UNDER {
+					parentFontSize = Math.max(Element.MIN_FONT_SIZE, parentFontSize * OVER_UNDER_FONT_RATIO)
+					first.calculateSize(renderer, null, parentFontSize)
+					second.calculateSize(renderer, null, parentFontSize)
+					box.width = Math.max(first.box.width, second.box.width)
+					box.upperHeight = first.box.height
+					box.lowerHeight = second.box.height
+				}
+			}
 		}
 
 		over updateLayout(x double, y double) {
 			box.x = x
 			box.y = y
-			top.updateLayout(x + (box.width - top.box.width) / 2, y)
-			bottom.updateLayout(x + (box.width - bottom.box.width) / 2, y + box.upperHeight)
+
+			switch kind {
+				case .FRACTION {
+					first.updateLayout(x + (box.width - first.box.width) / 2, y)
+					second.updateLayout(x + (box.width - second.box.width) / 2, y + box.upperHeight)
+				}
+
+				case .OVER_UNDER {
+					first.updateLayout(x, y)
+					second.updateLayout(x, y + box.upperHeight)
+				}
+			}
 		}
 
 		over render(renderer Renderer) {
-			top.render(renderer)
-			bottom.render(renderer)
-			renderer.addLine(box.x + 2, box.y + box.upperHeight, box.x + box.width - 2, box.y + box.upperHeight)
+			first.render(renderer)
+			second.render(renderer)
+
+			switch kind {
+				case .FRACTION {
+					renderer.addLine(box.x + 2, box.y + box.upperHeight, box.x + box.width - 2, box.y + box.upperHeight)
+				}
+			}
 		}
+	}
+
+	namespace Special {
+		const FRACTION_FONT_RATIO = 0.8
+		const OVER_UNDER_FONT_RATIO = 0.5
 	}
 
 	################################################################################
