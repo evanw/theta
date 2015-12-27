@@ -21,6 +21,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	var _isInvalid = true
 	var _idleFrames = 0
 	var _oldTouches List<OldTouch> = []
+	var _clipboard = Layout.Container.new
 
 	# Animation support
 	var _animation Animation = .NONE
@@ -176,6 +177,9 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	def handleShortcut(shortcut Platform.Shortcut) {
 		switch shortcut {
 			case .SELECT_ALL { _editor.selectAll }
+			case .CUT { _clipboard = _editor.cut }
+			case .COPY { _clipboard = _editor.copy }
+			case .PASTE { _editor.insert(_clipboard) }
 
 			case .MOVE_LEFT_CHARACTER { _editor.move(.LEFT, .CHARACTER, .RESET) }
 			case .MOVE_RIGHT_CHARACTER { _editor.move(.RIGHT, .CHARACTER, .RESET) }
@@ -225,7 +229,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		}
 	}
 
-	def handleEditorUpdate {
+	def handleEditorChange(change Layout.Editor.Change) {
 		_resetCursorBlink
 	}
 

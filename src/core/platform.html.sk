@@ -157,7 +157,7 @@ class HTMLPlatform :: Platform {
 				code >= 'a' && code <= 'z' ||
 				code >= 'A' && code <= 'Z' ||
 				code >= '0' && code <= '9' || code == '.' ||
-				code == '+' || code == '-' || code == '*' || code == '/' ||
+				code == '+' || code == '-' || code == '*' || code == '/' || code == '÷' ||
 				code == '<' || code == '>' || code == '≤' || code == '≥' || code == '=' ||
 				code == ','
 			) {

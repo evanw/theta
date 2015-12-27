@@ -25,6 +25,7 @@ namespace Layout {
 	}
 
 	const CODE_POINTS_WITH_SPACES = {
+		'÷': 0,
 		'=': 0,
 		'<': 0,
 		'>': 0,
@@ -129,6 +130,16 @@ namespace Layout {
 
 		def isEmpty bool {
 			return _start.relativeIndex == _end.relativeIndex
+		}
+
+		def extractSelection Container {
+			var range = expandedRange
+			var anchor = range.start.deepestAnchor
+			var container = Container.new
+			for i in anchor.internalIndex..range.end.deepestAnchor.internalIndex {
+				container.children.append(anchor.containerElement.children[i].clone)
+			}
+			return container
 		}
 
 		def delete {
@@ -474,8 +485,13 @@ namespace Layout {
 
 	################################################################################
 
+	enum Editor.Change {
+		SELECTION
+		CONTENTS
+	}
+
 	interface Editor.Delegate {
-		def handleEditorUpdate
+		def handleEditorChange(change Change)
 	}
 
 	class Editor {
@@ -509,12 +525,26 @@ namespace Layout {
 
 		def selectAll {
 			_selection.changeAnchors(_root.anchorAt(0), _root.anchorAt(_root.anchorCount - 1))
-			_notifyDelegate
+			_notifyDelegate(.SELECTION)
+		}
+
+		def cut Container {
+			var container = copy
+			if !container.children.isEmpty {
+				_selection.delete
+				_updateLayout
+				_notifyDelegate(.CONTENTS)
+			}
+			return container
+		}
+
+		def copy Container {
+			return _selection.extractSelection
 		}
 
 		def move(direction Direction, boundary Boundary, behavior Behavior) {
 			_selection.move(direction, boundary, behavior)
-			_notifyDelegate
+			_notifyDelegate(.SELECTION)
 		}
 
 		def delete(direction Direction, boundary Boundary) {
@@ -524,19 +554,19 @@ namespace Layout {
 			if !_selection.isEmpty {
 				_selection.delete
 				_updateLayout
-				_notifyDelegate
+				_notifyDelegate(.CONTENTS)
 			}
 		}
 
 		def insert(container Container) {
 			if !container.children.isEmpty {
-				var clone = container.clone as Container
 				_selection.delete
+				var clone = container.clone as Container
 				var anchor = _selection.start.deepestAnchor
 				anchor.containerElement.children.insert(anchor.internalIndex, clone.children)
 				_updateLayout
 				_selection.changeAnchor(_root.anchorAt(_selection.start.relativeIndex + clone.anchorCount - 1))
-				_notifyDelegate
+				_notifyDelegate(.CONTENTS)
 			}
 		}
 
@@ -545,9 +575,9 @@ namespace Layout {
 			_root.updateLayout(_originX, _originY)
 		}
 
-		def _notifyDelegate {
+		def _notifyDelegate(change Change) {
 			if _delegate != null {
-				_delegate.handleEditorUpdate
+				_delegate.handleEditorChange(change)
 			}
 		}
 	}
