@@ -215,22 +215,23 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 
 		if codePoint == '/' {
 			var special = Layout.Special.new(.FRACTION)
-			special.first.children.append(_editor.copy.children)
+			var selection = _editor.copy
+			special.children.append(selection)
+			special.children.append(Layout.Container.new)
 			c.children.append(special)
 			_editor.insert(c)
 			_editor.move(.LEFT, .CHARACTER, .RESET)
-			if special.first.children.isEmpty {
+			if selection.children.isEmpty {
 				_editor.move(.LEFT, .CHARACTER, .RESET)
 			}
 		}
 
 		else if codePoint == '^' || codePoint == '_' {
-			c.children.append(Layout.Special.new(.OVER_UNDER))
+			var special = Layout.Special.new(codePoint == '^' ? .OVER : .UNDER)
+			special.children.append(Layout.Container.new)
+			c.children.append(special)
 			_editor.insert(c)
 			_editor.move(.LEFT, .CHARACTER, .RESET)
-			if codePoint == '^' {
-				_editor.move(.LEFT, .CHARACTER, .RESET)
-			}
 		}
 
 		else {

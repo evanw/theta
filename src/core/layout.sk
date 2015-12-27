@@ -320,8 +320,8 @@ namespace Layout {
 				box.width += paddingLeft * 2
 			}
 
-			box.upperHeight = renderer.lineHeight * parentFontSize * 0.6
-			box.lowerHeight = renderer.lineHeight * parentFontSize * 0.4
+			box.upperHeight = renderer.lineHeight * parentFontSize * UPPER_FONT_RATIO
+			box.lowerHeight = renderer.lineHeight * parentFontSize * LOWER_FONT_RATIO
 		}
 
 		over updateLayout(x double, y double) {
@@ -338,6 +338,11 @@ namespace Layout {
 			if codePoint == '*' { return '·' }
 			return codePoint
 		}
+	}
+
+	namespace Character {
+		const UPPER_FONT_RATIO = 0.6
+		const LOWER_FONT_RATIO = 0.4
 	}
 
 	################################################################################
@@ -434,56 +439,94 @@ namespace Layout {
 
 	enum Special.Kind {
 		FRACTION
-		OVER_UNDER
+		OVER
+		UNDER
 	}
 
 	class Special : Element {
 		const kind Kind
-		const first = Container.new
-		const second = Container.new
+		const children List<Container> = []
 
 		over clone Element {
 			var clone = new(kind)
-			clone.first.children.append((first.clone as Container).children)
-			clone.second.children.append((second.clone as Container).children)
+			for child in children {
+				clone.children.append(child.clone as Container)
+			}
 			return clone
 		}
 
 		over anchorCount int {
-			return first.anchorCount + second.anchorCount
+			var total = 0
+			for child in children {
+				total += child.anchorCount
+			}
+			return total
 		}
 
 		over anchorCountBefore(index int) int {
-			assert(index == 0 || index == 1)
-			return index == 0 ? 0 : first.anchorCount
+			assert(0 <= index && index < children.count)
+			var total = 0
+			for i in 0..index {
+				total += children[i].anchorCount
+			}
+			return total
 		}
 
 		over anchorAt(index int) Anchor {
 			assert(index >= 0 && index < anchorCount)
-			var secondIndex = index - first.anchorCount
-			return secondIndex < 0
-				? Anchor.new(self, index, 0, first.anchorAt(index))
-				: Anchor.new(self, index, 1, second.anchorAt(secondIndex))
+			var relative = index
+			for i in 0..children.count {
+				var child = children[i]
+				var count = child.anchorCount
+				if relative < count {
+					return Anchor.new(self, index, i, child.anchorAt(relative))
+				}
+				relative -= count
+			}
+			assert(false)
+			return null
 		}
 
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
+			var fontSize = parentFontSize
+
 			switch kind {
 				case .FRACTION {
-					parentFontSize = Math.max(Element.MIN_FONT_SIZE, parentFontSize * FRACTION_FONT_RATIO)
-					first.calculateSize(renderer, null, parentFontSize)
-					second.calculateSize(renderer, null, parentFontSize)
-					box.width = Math.max(first.box.width, second.box.width) + 8
-					box.upperHeight = first.box.height + 2
-					box.lowerHeight = second.box.height + 2
+					fontSize = Math.max(Element.MIN_FONT_SIZE, fontSize * FRACTION_FONT_RATIO)
 				}
 
-				case .OVER_UNDER {
-					parentFontSize = Math.max(Element.MIN_FONT_SIZE, parentFontSize * OVER_UNDER_FONT_RATIO)
-					first.calculateSize(renderer, null, parentFontSize)
-					second.calculateSize(renderer, null, parentFontSize)
-					box.width = Math.max(first.box.width, second.box.width)
-					box.upperHeight = first.box.height
+				case .OVER, .UNDER {
+					fontSize = Math.max(Element.MIN_FONT_SIZE, fontSize * OVER_UNDER_FONT_RATIO)
+				}
+			}
+
+			for child in children {
+				child.calculateSize(renderer, null, fontSize)
+			}
+
+			switch kind {
+				case .FRACTION {
+					assert(children.count == 2)
+					var first = children[0]
+					var second = children[1]
+
+					box.width = Math.max(first.box.width, second.box.width) + 8
+					box.upperHeight = first.box.height + 2
 					box.lowerHeight = second.box.height
+				}
+
+				case .OVER {
+					assert(children.count == 1)
+					box.width = children[0].box.width
+					box.upperHeight = (previous != null ? Math.max(0, previous.box.upperHeight - parentFontSize * Character.UPPER_FONT_RATIO) : 0) + children[0].box.height
+					box.lowerHeight = 0
+				}
+
+				case .UNDER {
+					assert(children.count == 1)
+					box.width = children[0].box.width
+					box.upperHeight = 0
+					box.lowerHeight = (previous != null ? Math.max(0, previous.box.lowerHeight - parentFontSize * Character.LOWER_FONT_RATIO) : 0) + children[0].box.height
 				}
 			}
 		}
@@ -494,20 +537,27 @@ namespace Layout {
 
 			switch kind {
 				case .FRACTION {
-					first.updateLayout(x + (box.width - first.box.width) / 2, y)
-					second.updateLayout(x + (box.width - second.box.width) / 2, y + box.upperHeight)
+					assert(children.count == 2)
+					children[0].updateLayout(x + (box.width - children[0].box.width) / 2, y)
+					children[1].updateLayout(x + (box.width - children[1].box.width) / 2, y + box.upperHeight)
 				}
 
-				case .OVER_UNDER {
-					first.updateLayout(x, y)
-					second.updateLayout(x, y + box.upperHeight)
+				case .OVER {
+					assert(children.count == 1)
+					children[0].updateLayout(x, y)
+				}
+
+				case .UNDER {
+					assert(children.count == 1)
+					children[0].updateLayout(x, y + box.height - children[0].box.height)
 				}
 			}
 		}
 
 		over render(renderer Renderer) {
-			first.render(renderer)
-			second.render(renderer)
+			for child in children {
+				child.render(renderer)
+			}
 
 			switch kind {
 				case .FRACTION {
