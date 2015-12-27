@@ -2,6 +2,7 @@ class GPU.Smooth {
 	enum Loop {
 		CLOSED
 		OPEN
+		OPEN_WITHOUT_ENDPOINT_AA
 	}
 
 	const _format = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION4, .FLOAT, 4).add(GLSLX_NAME_COORD4, .BYTE, 4)
@@ -53,16 +54,18 @@ class GPU.Smooth {
 		fillConvexPolygon(_rectPoints, color)
 	}
 
-	def strokeLine(start Vector, end Vector, color Color, thickness double) {
-		_linePoints[0].set(start)
-		_linePoints[1].set(end)
-		strokeNonOverlappingPolyline(_linePoints, color, thickness, .OPEN)
+	def strokeLine(startX double, startY double, endX double, endY double, color Color, thickness double) {
+		_strokeLine(startX, startY, endX, endY, color, thickness, .OPEN)
 	}
 
-	def strokeLine(startX double, startY double, endX double, endY double, color Color, thickness double) {
+	def strokeLineWithoutEndpointAA(startX double, startY double, endX double, endY double, color Color, thickness double) {
+		_strokeLine(startX, startY, endX, endY, color, thickness, .OPEN_WITHOUT_ENDPOINT_AA)
+	}
+
+	def _strokeLine(startX double, startY double, endX double, endY double, color Color, thickness double, loop Loop) {
 		_linePoints[0].set(startX, startY)
 		_linePoints[1].set(endX, endY)
-		strokeNonOverlappingPolyline(_linePoints, color, thickness, .OPEN)
+		strokeNonOverlappingPolyline(_linePoints, color, thickness, loop)
 	}
 
 	def fillConvexPolygon(points List<Vector>, color Color) {
@@ -136,7 +139,7 @@ class GPU.Smooth {
 		color = color.premultiplied
 
 		# Emit the start cap
-		if loop == .OPEN {
+		if loop != .CLOSED {
 			var v0 = points[0]
 			var v1 = points[1]
 			var dx = v1.x - v0.x
@@ -148,11 +151,17 @@ class GPU.Smooth {
 			var v = halfWidth / d
 			var vx = -dy * v
 			var vy = dx * v
-			_appendVertex(v0.x - ux - vx, v0.y - uy - vy, -aa, 0, color)
-			_appendPreviousVertex
-			_appendVertex(v0.x - ux + vx, v0.y - uy + vy, 0, -aa, color)
-			_appendVertex(v0.x + ux - vx, v0.y + uy - vy, 0, aa, color)
-			_appendVertex(v0.x + ux + vx, v0.y + uy + vy, aa, 0, color)
+			if loop == .OPEN_WITHOUT_ENDPOINT_AA {
+				_appendVertex(v0.x - vx, v0.y - vy, 0, aa, color)
+				_appendPreviousVertex
+				_appendVertex(v0.x + vx, v0.y + vy, aa, 0, color)
+			} else {
+				_appendVertex(v0.x - ux - vx, v0.y - uy - vy, -aa, 0, color)
+				_appendPreviousVertex
+				_appendVertex(v0.x - ux + vx, v0.y - uy + vy, 0, -aa, color)
+				_appendVertex(v0.x + ux - vx, v0.y + uy - vy, 0, aa, color)
+				_appendVertex(v0.x + ux + vx, v0.y + uy + vy, aa, 0, color)
+			}
 		}
 
 		# Emit the joins between segments
@@ -179,7 +188,7 @@ class GPU.Smooth {
 		}
 
 		# Emit the end cap
-		if loop == .OPEN {
+		if loop != .CLOSED {
 			var v0 = points[n - 2]
 			var v1 = points[n - 1]
 			var dx = v1.x - v0.x
@@ -189,10 +198,15 @@ class GPU.Smooth {
 			var ux = dx * u
 			var uy = dy * u
 			var v = halfWidth / d, vx = -dy * v, vy = dx * v
-			_appendVertex(v1.x - ux - vx, v1.y - uy - vy, 0, aa, color)
-			_appendVertex(v1.x - ux + vx, v1.y - uy + vy, aa, 0, color)
-			_appendVertex(v1.x + ux - vx, v1.y + uy - vy, -aa, 0, color)
-			_appendVertex(v1.x + ux + vx, v1.y + uy + vy, 0, -aa, color)
+			if loop == .OPEN_WITHOUT_ENDPOINT_AA {
+				_appendVertex(v1.x - vx, v1.y - vy, 0, aa, color)
+				_appendVertex(v1.x + vx, v1.y + vy, aa, 0, color)
+			} else {
+				_appendVertex(v1.x - ux - vx, v1.y - uy - vy, 0, aa, color)
+				_appendVertex(v1.x - ux + vx, v1.y - uy + vy, aa, 0, color)
+				_appendVertex(v1.x + ux - vx, v1.y + uy - vy, -aa, 0, color)
+				_appendVertex(v1.x + ux + vx, v1.y + uy + vy, 0, -aa, color)
+			}
 		}
 		_appendPreviousVertex
 	}

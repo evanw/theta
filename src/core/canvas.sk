@@ -161,13 +161,13 @@ class Canvas :: Layout.Renderer {
 		# Horizontal axis
 		for x in left..right {
 			var tx = origin.x + x * scale / step
-			_smooth.strokeLine(tx, 0, tx, height, x == 0 ? .BLACK : x % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, x == 0 ? 2 : 1)
+			_smooth.strokeLineWithoutEndpointAA(tx, 0, tx, height, x == 0 ? .BLACK : x % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, x == 0 ? 2 : 1)
 		}
 
 		# Vertical axis
 		for y in top..bottom {
 			var ty = origin.y + y * scale / step
-			_smooth.strokeLine(0, ty, width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, y == 0 ? 2 : 1)
+			_smooth.strokeLineWithoutEndpointAA(0, ty, width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, y == 0 ? 2 : 1)
 		}
 
 		# Coordinate text and tick marks
