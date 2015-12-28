@@ -154,9 +154,9 @@ class Canvas :: Layout.Renderer {
 		var step = Math.pow(10, Math.round(Math.log(scale / 64) / Math.log(10)))
 		var ratio = step / scale
 		var left = Math.ceil(-origin.x * ratio) as int
-		var top = Math.ceil(-origin.y * ratio) as int
+		var top = Math.ceil((height - origin.y) * -ratio) as int
 		var right = Math.ceil((width - origin.x) * ratio) as int
-		var bottom = Math.ceil((height - origin.y) * ratio) as int
+		var bottom = Math.ceil(-origin.y * -ratio) as int
 
 		# Horizontal axis
 		for x in left..right {
@@ -166,7 +166,7 @@ class Canvas :: Layout.Renderer {
 
 		# Vertical axis
 		for y in top..bottom {
-			var ty = origin.y + y * scale / step
+			var ty = origin.y - y * scale / step
 			_smooth.strokeLineWithoutEndpointAA(0, ty, width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, y == 0 ? 2 : 1)
 		}
 
@@ -180,9 +180,9 @@ class Canvas :: Layout.Renderer {
 			1)
 		var textRatio = textStep / scale
 		var textLeft = Math.ceil((-100 - origin.x) * textRatio) as int
-		var textTop = Math.ceil((-100 - origin.y) * textRatio) as int
+		var textTop = Math.ceil((height - origin.y) * -textRatio) as int
 		var textRight = Math.ceil((width - origin.x) * textRatio) as int
-		var textBottom = Math.ceil((height - origin.y) * textRatio) as int
+		var textBottom = Math.ceil((-100 - origin.y) * -textRatio) as int
 
 		# Horizontal axis
 		var textY = Math.clamp(origin.y, 0, height - GRID_FONT_SIZE * 1.3)
@@ -199,7 +199,7 @@ class Canvas :: Layout.Renderer {
 		for y in textTop..textBottom {
 			if y != 0 {
 				var text = _formatNumber(y / textStep)
-				var ty = origin.y + y * scale / textStep
+				var ty = origin.y - y * scale / textStep
 				_smooth.strokeLine(origin.x - GRID_TICK_SIZE, ty, origin.x + GRID_TICK_SIZE, ty, .BLACK, 2)
 				_addText(text, Math.min(textX, width - _computeTextWidth(text, GRID_FONT_SIZE) - GRID_FONT_SIZE * 0.3),
 					ty + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE)
@@ -214,7 +214,7 @@ class Canvas :: Layout.Renderer {
 
 	def drawFunction {
 		_transformA.reset
-		_transformA.scale(1 / _scale)
+		_transformA.scale(1 / _scale, -1 / scale)
 		_transformA.translate(-_origin.x, -_origin.y)
 		_transformA.scale(_platform.width * 0.5, -_platform.height * 0.5)
 		_transformA.translate(1, -1)
