@@ -299,10 +299,24 @@ namespace App {
 
 	@entry
 	def main {
+		var platform Platform
+
+		try {
+			platform = HTMLPlatform.new
+		}
+
+		catch e dynamic {
+			if e && e.message == "Could not initialize WebGL" {
+				document.write("This application requires WebGL.")
+				return
+			}
+			throw e
+		}
+
 		var xhr = XMLHttpRequest.new
 		xhr.open("GET", "fonts.bin")
 		xhr.onload = => {
-			new(HTMLPlatform.new, DataArray.new(Uint8Array.new(xhr.response)))
+			new(platform, DataArray.new(Uint8Array.new(xhr.response)))
 		}
 		xhr.responseType = "arraybuffer"
 		xhr.send

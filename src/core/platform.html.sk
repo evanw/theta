@@ -41,6 +41,13 @@ class HTMLPlatform :: Platform {
 			requestAnimationFrame(tick)
 		}
 
+		var handleNotchedPinch = (e HTMLMouseEvent, wheelNotches double) => {
+			if _delegate != null {
+				_delegate.handlePinch(e.pageX, e.pageY, wheelNotches * 16)
+			}
+			e.preventDefault
+		}
+
 		var shortcutMap IntMap<Platform.Shortcut> = {
 			_shortcut(KEY_BACKSPACE, 0): .DELETE_LEFT_CHARACTER,
 			_shortcut(KEY_DELETE, 0): .DELETE_RIGHT_CHARACTER,
@@ -63,6 +70,8 @@ class HTMLPlatform :: Platform {
 		}
 
 		var isOSX = _os == .OSX
+		var userAgent = navigator.userAgent
+		var isIE = "Trident" in userAgent
 		var wordFlags KeyFlags = isOSX ? .ALT : .CONTROL
 		var shortcutFlags KeyFlags = isOSX ? .META : .CONTROL
 
@@ -97,21 +106,47 @@ class HTMLPlatform :: Platform {
 			shortcutMap[_shortcut('K', .CONTROL)] = .DELETE_RIGHT_LINE
 		}
 
-		canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
-			var swap = !isOSX && e.shiftKey
-			if e.ctrlKey || isOSX && e.metaKey {
-				if _delegate != null {
-					_delegate.handlePinch(e.pageX, e.pageY, e.deltaY)
+		# The wheel event on OS X is nice and simple
+		if isOSX {
+			canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
+				# Chrome, Safari, and Firefox on OS X for a trackpad: +/- 1 pixel (or a real mouse disguised as a trackpad by Chrome and Safari, no way to know for sure)
+				if e.deltaMode == e.DOM_DELTA_PIXEL {
+					if e.ctrlKey || e.metaKey {
+						_delegate.handlePinch(e.pageX, e.pageY, e.deltaY) # Chrome-only pinch zoom support
+					} else {
+						_delegate.handleScroll(e.deltaX, e.deltaY) # Two-finger scrolling to pan around
+					}
+					e.preventDefault
 				}
-			} else {
-				if _delegate != null {
-					_delegate.handleScroll(
-						swap ? e.deltaY : e.deltaX,
-						swap ? e.deltaX : e.deltaY)
+
+				# Firefox on OS X for a real mouse: +/- 1 lines (not actual notches due to accelerated scrolling)
+				else {
+					handleNotchedPinch(e, e.deltaY)
 				}
+			})
+		}
+
+		# The wheel event on Windows is a disaster
+		else {
+			# IE returns random crap for "e.deltaY" in the "wheel" event. For example,
+			# I get 59.099998474121094 for a maximized window with Developer Tools open.
+			# I have no idea what the relationship is between these values and wheel
+			# notches but it's definitely non-linear. Anyway, the "mousewheel" event
+			# seems to report +/- 120 reliably, so use that instead.
+			if isIE {
+				canvas.addEventListener("mousewheel", (e HTMLMouseWheelEvent) => {
+					handleNotchedPinch(e, -e.wheelDelta / 120)
+				})
 			}
-			e.preventDefault
-		})
+
+			# Firefox on Windows: +/- 3 lines
+			# Chrome on Windows: +/- 100 pixels
+			else {
+				canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
+					handleNotchedPinch(e, e.deltaY / (e.deltaMode == e.DOM_DELTA_LINE ? 3 : 100))
+				})
+			}
+		}
 
 		canvas.addEventListener("touchstart", (e HTMLTouchEvent) => {
 			e.preventDefault

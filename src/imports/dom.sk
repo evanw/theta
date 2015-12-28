@@ -126,6 +126,10 @@ if TARGET == .JAVASCRIPT {
 			def removeEventListener(type string, listener fn(HTMLTouchEvent)) { HTML.off(self, type, listener) }
 			def removeEventListener(type string, listener fn(HTMLKeyboardEvent)) { HTML.off(self, type, listener) }
 			def removeEventListener(type string, listener fn(HTMLWheelEvent)) { HTML.off(self, type, listener) }
+
+			def open
+			def write(text string)
+			def close
 		}
 
 		class HTMLEvent {
@@ -213,6 +217,10 @@ if TARGET == .JAVASCRIPT {
 			const which int
 		}
 
+		class HTMLMouseWheelEvent : HTMLMouseEvent {
+			const wheelDelta double
+		}
+
 		class HTMLWheelEvent : HTMLMouseEvent {
 			const deltaMode int
 			const deltaX double
@@ -232,6 +240,7 @@ if TARGET == .JAVASCRIPT {
 			def addEventListener(type string, listener fn(HTMLMouseEvent)) { HTML.on(self, type, listener) }
 			def addEventListener(type string, listener fn(HTMLTouchEvent)) { HTML.on(self, type, listener) }
 			def addEventListener(type string, listener fn(HTMLWheelEvent)) { HTML.on(self, type, listener) }
+			def addEventListener(type string, listener fn(HTMLMouseWheelEvent)) { HTML.on(self, type, listener) }
 
 			def removeEventListener(type string, listener fn()) { HTML.off(self, type, listener) }
 			def removeEventListener(type string, listener fn(HTMLEvent)) { HTML.off(self, type, listener) }
@@ -239,6 +248,7 @@ if TARGET == .JAVASCRIPT {
 			def removeEventListener(type string, listener fn(HTMLMouseEvent)) { HTML.off(self, type, listener) }
 			def removeEventListener(type string, listener fn(HTMLTouchEvent)) { HTML.off(self, type, listener) }
 			def removeEventListener(type string, listener fn(HTMLWheelEvent)) { HTML.off(self, type, listener) }
+			def removeEventListener(type string, listener fn(HTMLMouseWheelEvent)) { HTML.off(self, type, listener) }
 
 			def focus
 			def blur

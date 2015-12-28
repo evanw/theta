@@ -1,15 +1,17 @@
 if TARGET == .JAVASCRIPT {
 	class HTMLCanvasElement {
 		def getContextWebGL WebGLRenderingContext {
-			try { return (self as dynamic).getContext("webgl") }
-			try { return (self as dynamic).getContext("experimental-webgl") }
-			return null
+			var gl WebGLRenderingContext = null
+			try { gl = (self as dynamic).getContext("webgl") }
+			try { gl ?= (self as dynamic).getContext("experimental-webgl") }
+			return gl
 		}
 
 		def getContextWebGL(options dynamic) WebGLRenderingContext {
-			try { return (self as dynamic).getContext("webgl", options) }
-			try { return (self as dynamic).getContext("experimental-webgl", options) }
-			return null
+			var gl WebGLRenderingContext = null
+			try { gl = (self as dynamic).getContext("webgl", options) }
+			try { gl ?= (self as dynamic).getContext("experimental-webgl", options) }
+			return gl
 		}
 	}
 
