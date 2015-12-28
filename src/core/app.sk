@@ -48,6 +48,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		c.children.append(Layout.Character.new('≤'))
 		c.children.append(Layout.Character.new('x'))
 		_editor.insert(c)
+		_editor.resetHistory
 	}
 
 	def handleFrame {
@@ -176,6 +177,8 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 
 	def handleShortcut(shortcut Platform.Shortcut) {
 		switch shortcut {
+			case .UNDO { _editor.undo }
+			case .REDO { _editor.redo }
 			case .SELECT_ALL { _editor.selectAll }
 			case .CUT { _clipboard = _editor.cut }
 			case .COPY { _clipboard = _editor.copy }

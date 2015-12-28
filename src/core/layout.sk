@@ -87,6 +87,12 @@ namespace Layout {
 		var _start Anchor
 		var _end Anchor
 
+		def clone(root Container) Range {
+			return new(root,
+				root.anchorAt(_start.relativeIndex),
+				root.anchorAt(_end.relativeIndex))
+		}
+
 		def root Container {
 			return _root
 		}
@@ -266,6 +272,11 @@ namespace Layout {
 
 	class Element {
 		var box = Box.new
+
+		def containerClone Container {
+			assert(clone is Container)
+			return clone as Container
+		}
 
 		def clone Element
 		def anchorCount int
@@ -464,7 +475,7 @@ namespace Layout {
 		over clone Element {
 			var clone = new(kind)
 			for child in children {
-				clone.children.append(child.clone as Container)
+				clone.children.append(child.containerClone)
 			}
 			return clone
 		}
@@ -597,13 +608,22 @@ namespace Layout {
 		def handleEditorChange(change Change)
 	}
 
+	class Editor.HistoryState {
+		var root Container
+		var undoSelection Range
+		var redoSelection Range
+	}
+
 	class Editor {
 		const _renderer Renderer
 		const _originX int
 		const _originY int
-		const _root = Container.new
-		const _selection Range
+		var _root = Container.new
+		var _selection Range
+		var _selectionBeforeChange Range = null
 		var _delegate Delegate = null
+		var _history List<HistoryState> = []
+		var _historyIndex = 0
 
 		def new(renderer Renderer, originX int, originY int) {
 			_renderer = renderer
@@ -611,6 +631,7 @@ namespace Layout {
 			_originY = originY
 			_updateLayout
 			_selection = Range.new(_root, _root.anchorAt(0), _root.anchorAt(0))
+			resetHistory
 		}
 
 		def hasSelection bool {
@@ -626,23 +647,104 @@ namespace Layout {
 			_selection.render(_renderer, cursor)
 		}
 
+		def undo {
+			if _historyIndex > 0 {
+				var state = _history[--_historyIndex]
+				_restore(state, state.undoSelection)
+			}
+		}
+
+		def redo {
+			if _historyIndex + 1 < _history.count {
+				var state = _history[++_historyIndex]
+				_restore(state, state.redoSelection)
+			}
+		}
+
+		def resetHistory {
+			var root = _root.containerClone
+			_history = [HistoryState.new(root, null, _selection.clone(root))]
+			_historyIndex = 0
+		}
+
 		def selectAll {
 			_selection.changeAnchors(_root.anchorAt(0), _root.anchorAt(_root.anchorCount - 1))
-			_notifyDelegate(.SELECTION)
+			_notifyDelegateOfChange(.SELECTION)
 		}
 
 		def cut Container {
+			_recordBeforeChange
 			var container = copy
 			if !container.children.isEmpty {
 				_selection.delete
-				_updateLayout
-				_notifyDelegate(.CONTENTS)
+				_commitAfterChange
 			}
 			return container
 		}
 
 		def copy Container {
 			return _selection.extractSelection
+		}
+
+		def move(direction Direction, boundary Boundary, behavior Behavior) {
+			_selection.move(direction, boundary, behavior)
+			_notifyDelegateOfChange(.SELECTION)
+		}
+
+		def delete(direction Direction, boundary Boundary) {
+			_recordBeforeChange
+			if _selection.isEmpty {
+				_selection.move(direction, boundary, .EXTEND)
+			}
+			if !_selection.isEmpty {
+				_selection.delete
+				_commitAfterChange
+			}
+		}
+
+		def insert(container Container) {
+			_recordBeforeChange
+			if !container.children.isEmpty {
+				_selection.delete
+				var clone = container.containerClone
+				var anchor = _selection.start.deepestAnchor
+				anchor.containerElement.children.insert(anchor.internalIndex, clone.children)
+				_selection.changeAnchor(_root.anchorAt(_selection.start.relativeIndex + clone.anchorCount - 1))
+				_applySubstitutions(_root, 0)
+				_commitAfterChange
+			}
+		}
+
+		def _updateLayout {
+			_root.calculateSize(_renderer, null, Element.BASE_FONT_SIZE)
+			_root.updateLayout(_originX, _originY)
+		}
+
+		def _notifyDelegateOfChange(change Change) {
+			if _delegate != null {
+				_delegate.handleEditorChange(change)
+			}
+		}
+
+		def _restore(state HistoryState, selection Range) {
+			_root = state.root.containerClone
+			_selection = selection.clone(_root)
+			_updateLayout
+			_notifyDelegateOfChange(.CONTENTS)
+		}
+
+		def _recordBeforeChange {
+			_selectionBeforeChange = _selection.clone(_root)
+		}
+
+		def _commitAfterChange {
+			var root = _root.containerClone
+			var last = _history[_historyIndex]
+			last.undoSelection = _selectionBeforeChange.clone(last.root)
+			_history.removeRange(++_historyIndex, _history.count)
+			_history.append(HistoryState.new(root, null, _selection.clone(root)))
+			_updateLayout
+			_notifyDelegateOfChange(.CONTENTS)
 		}
 
 		def _applySubstitutions(container Container, indexBase int) {
@@ -703,46 +805,6 @@ namespace Layout {
 				# Move to the next child
 				childIndexBase += 1 + child.anchorCount
 				i++
-			}
-		}
-
-		def move(direction Direction, boundary Boundary, behavior Behavior) {
-			_selection.move(direction, boundary, behavior)
-			_notifyDelegate(.SELECTION)
-		}
-
-		def delete(direction Direction, boundary Boundary) {
-			if _selection.isEmpty {
-				_selection.move(direction, boundary, .EXTEND)
-			}
-			if !_selection.isEmpty {
-				_selection.delete
-				_updateLayout
-				_notifyDelegate(.CONTENTS)
-			}
-		}
-
-		def insert(container Container) {
-			if !container.children.isEmpty {
-				_selection.delete
-				var clone = container.clone as Container
-				var anchor = _selection.start.deepestAnchor
-				anchor.containerElement.children.insert(anchor.internalIndex, clone.children)
-				_selection.changeAnchor(_root.anchorAt(_selection.start.relativeIndex + clone.anchorCount - 1))
-				_applySubstitutions(_root, 0)
-				_updateLayout
-				_notifyDelegate(.CONTENTS)
-			}
-		}
-
-		def _updateLayout {
-			_root.calculateSize(_renderer, null, Element.BASE_FONT_SIZE)
-			_root.updateLayout(_originX, _originY)
-		}
-
-		def _notifyDelegate(change Change) {
-			if _delegate != null {
-				_delegate.handleEditorChange(change)
 			}
 		}
 	}
