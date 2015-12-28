@@ -12,9 +12,9 @@ interface Platform.Delegate {
 	def handleScroll(deltaX double, deltaY double)
 	def handlePinch(x double, y double, delta double)
 	def handleResize
-	def handleTouchStart(centerX double, centerY double, averageDistance double)
-	def handleTouchMove(centerX double, centerY double, averageDistance double)
-	def handleTouchEnd(centerX double, centerY double, averageDistance double)
+	def handleTouchStart(centerX double, centerY double, averageDistance double, touchCount int)
+	def handleTouchMove(centerX double, centerY double, averageDistance double, touchCount int)
+	def handleTouchEnd(centerX double, centerY double, averageDistance double, touchCount int)
 	def handleShortcut(shortcut Shortcut)
 	def handleCodePoint(codePoint int)
 	def handleFocusChange

@@ -23,18 +23,29 @@ class HTMLPlatform :: Platform {
 		}
 
 		var resize = => {
-			_width = window.innerWidth
-			_height = window.innerHeight
-			_density = window.devicePixelRatio
-			_pixelWidth = Math.round(_width * _density) as int
-			_pixelHeight = Math.round(_height * _density) as int
-			_context.resize(_pixelWidth, _pixelHeight)
-			if _delegate != null {
-				_delegate.handleResize
+			var width = window.innerWidth
+			var height = window.innerHeight
+			var density = window.devicePixelRatio
+
+			if width != _width || height != _height || density != _density {
+				_width = window.innerWidth
+				_height = window.innerHeight
+				_density = window.devicePixelRatio
+				_pixelWidth = Math.round(_width * _density) as int
+				_pixelHeight = Math.round(_height * _density) as int
+				_context.resize(_pixelWidth, _pixelHeight, _width, _height)
+
+				if _delegate != null {
+					_delegate.handleResize
+				}
 			}
 		}
 
 		var tick fn() = => {
+			# Mobile Safari doesn't report the right size on page load and I'm not
+			# sure when the right size shows up, so poll every frame instead
+			resize()
+
 			if _delegate != null {
 				_delegate.handleFrame
 			}
@@ -154,7 +165,7 @@ class HTMLPlatform :: Platform {
 			if _delegate != null {
 				var touches = e.touches
 				_computeCentroid(touches, centroid)
-				_delegate.handleTouchStart(centroid.x, centroid.y, _computeDistance(touches, centroid))
+				_delegate.handleTouchStart(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
 			}
 		})
 
@@ -162,7 +173,7 @@ class HTMLPlatform :: Platform {
 			if _delegate != null {
 				var touches = e.touches
 				_computeCentroid(touches, centroid)
-				_delegate.handleTouchMove(centroid.x, centroid.y, _computeDistance(touches, centroid))
+				_delegate.handleTouchMove(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
 			}
 		})
 
@@ -170,7 +181,7 @@ class HTMLPlatform :: Platform {
 			if _delegate != null {
 				var touches = e.touches
 				_computeCentroid(touches, centroid)
-				_delegate.handleTouchEnd(centroid.x, centroid.y, _computeDistance(touches, centroid))
+				_delegate.handleTouchEnd(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
 			}
 		})
 

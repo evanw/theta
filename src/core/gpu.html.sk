@@ -46,12 +46,7 @@ if TARGET == .JAVASCRIPT {
 				var style = canvas.style
 				canvas.width = 0
 				canvas.height = 0
-				style.position = "absolute"
-				style.display = "block"
-				style.left = "0"
-				style.top = "0"
-				style.width = "100%"
-				style.height = "100%"
+				style.width = style.height = "0"
 
 				canvas.addEventListener("webglcontextlost", (e HTMLEvent) => {
 					e.preventDefault
@@ -146,14 +141,17 @@ if TARGET == .JAVASCRIPT {
 				_forceStateUpdate = false
 			}
 
-			def resize(width int, height int) {
-				if _width != width || _height != height {
+			def resize(widthInPixels int, heightInPixels int, widthInAppUnits int, heightInAppUnits int) {
+				if _width != widthInPixels || _height != heightInPixels {
 					var canvas = _gl.canvas
-					canvas.width = width
-					canvas.height = height
-					setViewport(0, 0, width, height)
-					_width = width
-					_height = height
+					var style = canvas.style
+					canvas.width = widthInPixels
+					canvas.height = heightInPixels
+					style.width = "\(widthInAppUnits)px"
+					style.height = "\(heightInAppUnits)px"
+					setViewport(0, 0, widthInPixels, heightInPixels)
+					_width = widthInPixels
+					_height = heightInPixels
 				}
 			}
 

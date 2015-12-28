@@ -1,8 +1,9 @@
 class App.OldTouch {
-	var centerX double
-	var centerY double
-	var averageDistance double
-	var time double
+	const centerX double
+	const centerY double
+	const averageDistance double
+	const touchCount int
+	const time double
 }
 
 enum App.Animation {
@@ -40,6 +41,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_resetCursorBlink
 		platform.setDelegate(self)
 		_editor.setDelegate(self)
+		_draw
 	}
 
 	def _createInitialContent {
@@ -126,24 +128,26 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_draw
 	}
 
-	def handleTouchStart(centerX double, centerY double, averageDistance double) {
+	def handleTouchStart(centerX double, centerY double, averageDistance double, touchCount int) {
 		_stopAnimation
-		_oldTouches.append(OldTouch.new(centerX, centerY, averageDistance, _platform.seconds))
+		_oldTouches.append(OldTouch.new(centerX, centerY, averageDistance, touchCount, _platform.seconds))
 	}
 
-	def handleTouchMove(centerX double, centerY double, averageDistance double) {
+	def handleTouchMove(centerX double, centerY double, averageDistance double, touchCount int) {
 		var previous = _oldTouches.last
-		if averageDistance != 0 && previous.averageDistance != 0 {
-			_canvas.adjustScaleWithPin(previous.centerX, previous.centerY, averageDistance / previous.averageDistance)
+		if previous.touchCount == touchCount {
+			if averageDistance != 0 && previous.averageDistance != 0 {
+				_canvas.adjustScaleWithPin(previous.centerX, previous.centerY, averageDistance / previous.averageDistance)
+			}
+			_canvas.translateOrigin(centerX - previous.centerX, centerY - previous.centerY)
+			_invalidate
 		}
-		_canvas.translateOrigin(centerX - previous.centerX, centerY - previous.centerY)
-		_oldTouches.append(OldTouch.new(centerX, centerY, averageDistance, _platform.seconds))
-		_invalidate
+		_oldTouches.append(OldTouch.new(centerX, centerY, averageDistance, touchCount, _platform.seconds))
 	}
 
-	def handleTouchEnd(centerX double, centerY double, averageDistance double) {
-		if !averageDistance.isNaN {
-			_oldTouches.append(OldTouch.new(centerX, centerY, averageDistance, _platform.seconds))
+	def handleTouchEnd(centerX double, centerY double, averageDistance double, touchCount int) {
+		if touchCount != 0 {
+			_oldTouches.append(OldTouch.new(centerX, centerY, averageDistance, touchCount, _platform.seconds))
 			return
 		}
 
@@ -153,6 +157,11 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		# Search for an old touch that was long enough ago that the velocity should be stable
 		for i = count - 2; i >= 0; i-- {
 			var before = _oldTouches[i]
+
+			# Ignore touches due to a pinch gesture
+			if before.touchCount > 1 {
+				break
+			}
 
 			# Ignore old touches that are too recent
 			if time - before.time > 0.1 {
@@ -299,23 +308,23 @@ namespace App {
 
 	@entry
 	def main {
-		var platform Platform
-
-		try {
-			platform = HTMLPlatform.new
-		}
-
-		catch e dynamic {
-			if e && e.message == "Could not initialize WebGL" {
-				document.write("This application requires WebGL.")
-				return
-			}
-			throw e
-		}
-
 		var xhr = XMLHttpRequest.new
 		xhr.open("GET", "fonts.bin")
 		xhr.onload = => {
+			var platform Platform
+
+			try {
+				platform = HTMLPlatform.new
+			}
+
+			catch e dynamic {
+				if e && e.message == "Could not initialize WebGL" {
+					document.write("This application requires WebGL.")
+					return
+				}
+				throw e
+			}
+
 			new(platform, DataArray.new(Uint8Array.new(xhr.response)))
 		}
 		xhr.responseType = "arraybuffer"

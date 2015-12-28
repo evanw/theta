@@ -36,7 +36,7 @@ namespace GPU {
 		def endFrame
 		def height int
 		def removeContextResetHandler(callback fn())
-		def resize(width int, height int)
+		def resize(widthInPixels int, heightInPixels int, widthInAppUnits int, heightInAppUnits int)
 		def setTextureSet(textureSet TextureSet)
 		def setViewport(x int, y int, width int, height int)
 		def width int
