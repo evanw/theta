@@ -31,12 +31,12 @@ class HTMLPlatform :: Platform {
 			var density = window.devicePixelRatio
 
 			if width != _width || height != _height || density != _density {
-				_width = window.innerWidth
-				_height = window.innerHeight
-				_density = window.devicePixelRatio
-				_pixelWidth = Math.round(_width * _density) as int
-				_pixelHeight = Math.round(_height * _density) as int
-				_context.resize(_pixelWidth, _pixelHeight, _width, _height)
+				_width = width
+				_height = height
+				_density = density
+				_pixelWidth = Math.round(width * density) as int
+				_pixelHeight = Math.round(height * density) as int
+				_context.resize(_pixelWidth, _pixelHeight, width, height)
 
 				if _delegate != null {
 					_delegate.handleResize

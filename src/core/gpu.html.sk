@@ -142,17 +142,15 @@ if TARGET == .JAVASCRIPT {
 			}
 
 			def resize(widthInPixels int, heightInPixels int, widthInAppUnits int, heightInAppUnits int) {
-				if _width != widthInPixels || _height != heightInPixels {
-					var canvas = _gl.canvas
-					var style = canvas.style
-					canvas.width = widthInPixels
-					canvas.height = heightInPixels
-					style.width = "\(widthInAppUnits)px"
-					style.height = "\(heightInAppUnits)px"
-					setViewport(0, 0, widthInPixels, heightInPixels)
-					_width = widthInPixels
-					_height = heightInPixels
-				}
+				var canvas = _gl.canvas
+				var style = canvas.style
+				canvas.width = widthInPixels
+				canvas.height = heightInPixels
+				style.width = "\(widthInAppUnits)px"
+				style.height = "\(heightInAppUnits)px"
+				setViewport(0, 0, widthInPixels, heightInPixels)
+				_width = widthInPixels
+				_height = heightInPixels
 			}
 
 			def clear(color Color) {
