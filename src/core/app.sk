@@ -23,6 +23,8 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	var _idleFrames = 0
 	var _oldTouches List<OldTouch> = []
 	var _clipboard = Layout.Container.new
+	var _oldMouseX = 0
+	var _oldMouseY = 0
 
 	# Animation support
 	var _animation Animation = .NONE
@@ -182,6 +184,25 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		}
 
 		_oldTouches = []
+	}
+
+	def handleMouseDown(x int, y int, buttons Platform.Buttons) {
+		_oldMouseX = x
+		_oldMouseY = y
+	}
+
+	def handleMouseMove(x int, y int, buttons Platform.Buttons) {
+		if buttons != 0 {
+			_canvas.translateOrigin(x - _oldMouseX, y - _oldMouseY)
+			_invalidate
+		}
+		_oldMouseX = x
+		_oldMouseY = y
+	}
+
+	def handleMouseUp(x int, y int, buttons Platform.Buttons) {
+		_oldMouseX = x
+		_oldMouseY = y
 	}
 
 	def handleShortcut(shortcut Platform.Shortcut) {

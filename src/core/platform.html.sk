@@ -10,12 +10,15 @@ class HTMLPlatform :: Platform {
 	var _hasFocus = true
 
 	def new {
+		var undefined = dynamic.void(0)
 		var canvas = _context.gl.canvas
 		var centroid = Vector.new
 		var isHidden = false
 		var isBlurred = false
+		var buttons Platform.Buttons = 0
 
 		var handleFocusChange = => {
+			buttons = 0
 			_hasFocus = !isBlurred && !isHidden
 			if _delegate != null {
 				_delegate.handleFocusChange
@@ -50,13 +53,6 @@ class HTMLPlatform :: Platform {
 				_delegate.handleFrame
 			}
 			requestAnimationFrame(tick)
-		}
-
-		var handleNotchedPinch = (e HTMLMouseEvent, wheelNotches double) => {
-			if _delegate != null {
-				_delegate.handlePinch(e.pageX, e.pageY, wheelNotches * 16)
-			}
-			e.preventDefault
 		}
 
 		var shortcutMap IntMap<Platform.Shortcut> = {
@@ -132,7 +128,7 @@ class HTMLPlatform :: Platform {
 
 				# Firefox on OS X for a real mouse: +/- 1 lines (not actual notches due to accelerated scrolling)
 				else {
-					handleNotchedPinch(e, e.deltaY)
+					_handleNotchedPinch(e, e.deltaY)
 				}
 			})
 		}
@@ -146,7 +142,7 @@ class HTMLPlatform :: Platform {
 			# seems to report +/- 120 reliably, so use that instead.
 			if isIE {
 				canvas.addEventListener("mousewheel", (e HTMLMouseWheelEvent) => {
-					handleNotchedPinch(e, -e.wheelDelta / 120)
+					_handleNotchedPinch(e, -e.wheelDelta / 120)
 				})
 			}
 
@@ -154,7 +150,7 @@ class HTMLPlatform :: Platform {
 			# Chrome on Windows: +/- 100 pixels
 			else {
 				canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
-					handleNotchedPinch(e, e.deltaY / (e.deltaMode == e.DOM_DELTA_LINE ? 3 : 100))
+					_handleNotchedPinch(e, e.deltaY / (e.deltaMode == e.DOM_DELTA_LINE ? 3 : 100))
 				})
 			}
 		}
@@ -182,6 +178,51 @@ class HTMLPlatform :: Platform {
 				var touches = e.touches
 				_computeCentroid(touches, centroid)
 				_delegate.handleTouchEnd(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
+			}
+		})
+
+		canvas.addEventListener("mousedown", (e HTMLMouseEvent) => {
+			e.preventDefault
+
+			if _delegate != null {
+				var button = e.button
+				if e.buttons != undefined {
+					buttons = _buttonsFromMouseEvent(e)
+				} else {
+					# Safari is lame
+					buttons |=
+						button == 0 ? .LEFT :
+						button == 1 ? .MIDDLE :
+						button == 2 ? .RIGHT :
+						0
+				}
+				_delegate.handleMouseDown(e.pageX, e.pageY, buttons)
+			}
+		})
+
+		canvas.addEventListener("mousemove", (e HTMLMouseEvent) => {
+			if _delegate != null {
+				if e.buttons != undefined {
+					buttons = _buttonsFromMouseEvent(e)
+				}
+				_delegate.handleMouseMove(e.pageX, e.pageY, buttons)
+			}
+		})
+
+		canvas.addEventListener("mouseup", (e HTMLMouseEvent) => {
+			if _delegate != null {
+				var button = e.button
+				if e.buttons != undefined {
+					buttons = _buttonsFromMouseEvent(e)
+				} else {
+					# Safari is lame
+					buttons &=
+						button == 0 ? ~.LEFT :
+						button == 1 ? ~.MIDDLE :
+						button == 2 ? ~.RIGHT :
+						~0
+				}
+				_delegate.handleMouseUp(e.pageX, e.pageY, buttons)
 			}
 		})
 
@@ -295,6 +336,20 @@ class HTMLPlatform :: Platform {
 			distance += Math.sqrt(dx * dx + dy * dy)
 		}
 		return distance / touches.count
+	}
+
+	def _buttonsFromMouseEvent(e HTMLMouseEvent) Platform.Buttons {
+		return
+			((e.buttons & 1) != 0 ? .LEFT : 0) |
+			((e.buttons & 2) != 0 ? .MIDDLE : 0) |
+			((e.buttons & 4) != 0 ? .RIGHT : 0)
+	}
+
+	def _handleNotchedPinch(e HTMLMouseEvent, wheelNotches double) {
+		if _delegate != null {
+			_delegate.handlePinch(e.pageX, e.pageY, wheelNotches * 16)
+		}
+		e.preventDefault
 	}
 }
 

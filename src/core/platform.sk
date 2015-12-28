@@ -7,6 +7,12 @@ enum Platform.OS {
 	WINDOWS
 }
 
+flags Platform.Buttons {
+	LEFT
+	RIGHT
+	MIDDLE
+}
+
 interface Platform.Delegate {
 	def handleFrame
 	def handleScroll(deltaX double, deltaY double)
@@ -15,6 +21,9 @@ interface Platform.Delegate {
 	def handleTouchStart(centerX double, centerY double, averageDistance double, touchCount int)
 	def handleTouchMove(centerX double, centerY double, averageDistance double, touchCount int)
 	def handleTouchEnd(centerX double, centerY double, averageDistance double, touchCount int)
+	def handleMouseDown(x int, y int, buttons Buttons)
+	def handleMouseMove(x int, y int, buttons Buttons)
+	def handleMouseUp(x int, y int, buttons Buttons)
 	def handleShortcut(shortcut Shortcut)
 	def handleCodePoint(codePoint int)
 	def handleFocusChange
