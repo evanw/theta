@@ -1,4 +1,5 @@
 class HTMLPlatform :: Platform {
+	var _os = _currentOS
 	var _width = 0
 	var _height = 0
 	var _density = 0.0
@@ -61,7 +62,7 @@ class HTMLPlatform :: Platform {
 			_shortcut(KEY_END, .SHIFT): .EXTEND_RIGHT_LINE,
 		}
 
-		var isOSX = navigator.platform == "MacIntel" || navigator.platform == "MacPPC"
+		var isOSX = _os == .OSX
 		var wordFlags KeyFlags = isOSX ? .ALT : .CONTROL
 		var shortcutFlags KeyFlags = isOSX ? .META : .CONTROL
 
@@ -154,19 +155,18 @@ class HTMLPlatform :: Platform {
 		})
 
 		document.addEventListener("keypress", (e HTMLKeyboardEvent) => {
-			var code = e.which
+			var c = e.which
 			if _delegate != null && (
-				code >= 'a' && code <= 'z' ||
-				code >= 'A' && code <= 'Z' ||
-				code >= 'α' && code <= 'ω' ||
-				code >= 'Α' && code <= 'Ω' ||
-				code >= '0' && code <= '9' || code == '.' ||
-				code == '+' || code == '-' || code == '*' || code == '/' || code == '÷' ||
-				code == '<' || code == '>' || code == '≤' || code == '≥' || code == '=' ||
-				code == '(' || code == ')' || code == '[' || code == ']' || code == '{' || code == '}' ||
-				code == '^' || code == '_' || code == ',' || code == '!' || code == '|'
+				c >= 'a' && c <= 'z' ||
+				c >= 'A' && c <= 'Z' ||
+				c >= 'α' && c <= 'ω' ||
+				c >= 'Α' && c <= 'Ω' ||
+				c >= '0' && c <= '9' || c == '.' ||
+				c == '+' || c == '-' || c == '*' || c == '/' || c == '÷' ||
+				c == '<' || c == '>' || c == '≤' || c == '≥' || c == '=' ||
+				c == '(' || c == ')' || c == '^' || c == '_' || c == ',' || c == '!' || c == '|'
 			) {
-				_delegate.handleCodePoint(code)
+				_delegate.handleCodePoint(c)
 			}
 		})
 
@@ -190,6 +190,10 @@ class HTMLPlatform :: Platform {
 		document.body.appendChild(canvas)
 		resize()
 		tick()
+	}
+
+	def os Platform.OS {
+		return _os
 	}
 
 	def hasFocus bool {
@@ -267,5 +271,30 @@ namespace HTMLPlatform {
 
 	def _shortcut(which int, flags KeyFlags) int {
 		return which | (flags << 8)
+	}
+
+	def _currentOS Platform.OS {
+		var platform = navigator.platform
+		var userAgent = navigator.userAgent
+		return
+			# OS X encodes the architecture into the platform
+			platform == "MacIntel" || platform == "MacPPC" ? .OSX :
+
+			# MSDN sources say Win64 is used
+			platform == "Win32" || platform == "Win64" ? .WINDOWS :
+
+			# Assume the user is using Mobile Safari or Chrome and not some random
+			# browser with a strange platform (Opera apparently messes with this)
+			platform == "iPhone" || platform == "iPad" ? .IOS :
+
+			# Apparently most Android devices have a platform of "Linux" instead
+			# of "Android", so check the user agent instead. Also make sure to test
+			# for Android before Linux for this reason.
+			"Android" in userAgent ? .ANDROID :
+			"Linux" in platform ? .LINUX :
+
+			# The platform string has no specification and can be literally anything.
+			# Other examples: "BlackBerry", "Nintendo 3DS", "PlayStation 4", etc.
+			.UNKNOWN
 	}
 }

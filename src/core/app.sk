@@ -186,28 +186,26 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 
 			case .MOVE_LEFT_CHARACTER { _editor.move(.LEFT, .CHARACTER, .RESET) }
 			case .MOVE_RIGHT_CHARACTER { _editor.move(.RIGHT, .CHARACTER, .RESET) }
-
+			case .MOVE_LEFT_WORD { _editor.move(.LEFT, .WORD, .RESET) }
+			case .MOVE_RIGHT_WORD { _editor.move(.RIGHT, .WORD, .RESET) }
 			case .MOVE_LEFT_LINE { _editor.move(.LEFT, .LINE, .RESET) }
 			case .MOVE_RIGHT_LINE { _editor.move(.RIGHT, .LINE, .RESET) }
-
 			case .MOVE_UP { _editor.move(.LEFT, .LINE, .RESET) }
 			case .MOVE_DOWN { _editor.move(.RIGHT, .LINE, .RESET) }
 
 			case .EXTEND_LEFT_CHARACTER { _editor.move(.LEFT, .CHARACTER, .EXTEND) }
 			case .EXTEND_RIGHT_CHARACTER { _editor.move(.RIGHT, .CHARACTER, .EXTEND) }
-
+			case .EXTEND_LEFT_WORD { _editor.move(.LEFT, .WORD, .EXTEND) }
+			case .EXTEND_RIGHT_WORD { _editor.move(.RIGHT, .WORD, .EXTEND) }
 			case .EXTEND_LEFT_LINE { _editor.move(.LEFT, .LINE, .EXTEND) }
 			case .EXTEND_RIGHT_LINE { _editor.move(.RIGHT, .LINE, .EXTEND) }
-
 			case .EXTEND_UP { _editor.move(.LEFT, .LINE, .EXTEND) }
 			case .EXTEND_DOWN { _editor.move(.RIGHT, .LINE, .EXTEND) }
 
 			case .DELETE_LEFT_CHARACTER { _editor.delete(.LEFT, .CHARACTER) }
 			case .DELETE_RIGHT_CHARACTER { _editor.delete(.RIGHT, .CHARACTER) }
-
 			case .DELETE_LEFT_WORD { _editor.delete(.LEFT, .WORD) }
 			case .DELETE_RIGHT_WORD { _editor.delete(.RIGHT, .WORD) }
-
 			case .DELETE_LEFT_LINE { _editor.delete(.LEFT, .LINE) }
 			case .DELETE_RIGHT_LINE { _editor.delete(.RIGHT, .LINE) }
 		}

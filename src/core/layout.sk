@@ -216,10 +216,40 @@ namespace Layout {
 		def _move(root Container, anchor Anchor, direction Direction, boundary Boundary) Anchor {
 			var moved = root.anchorAt(Math.clamp(anchor.relativeIndex + direction.delta, 0, root.anchorCount - 1))
 
-			if boundary == .LINE {
+			if boundary != .CHARACTER {
 				var range = Range.new(root, anchor, moved).expandedRange
-				var deepest = range.start.deepestAnchor
-				moved = root.anchorAt(range.start.relativeIndex - deepest.relativeIndex + (direction == .LEFT ? 0 : deepest.containerElement.anchorCount - 1))
+				var expanded = direction == .LEFT ? range.start : range.end
+				var deepest = expanded.deepestAnchor
+				var indexBase = expanded.relativeIndex - deepest.relativeIndex
+
+				if boundary == .LINE {
+					moved = root.anchorAt(indexBase + (direction == .LEFT ? 0 : deepest.containerElement.anchorCount - 1))
+				}
+
+				else {
+					assert(boundary == .WORD)
+
+					var container = deepest.containerElement
+					var children = container.children
+					var count = children.count
+					var i = deepest.internalIndex
+					var isOperandLeft = (j int) => j > 0 ? children[j - 1].isOperand : false
+					var isOperandRight = (j int) => j < count ? children[j].isOperand : false
+
+					if direction == .LEFT {
+						while i > 0 && (isOperandLeft(i) || !isOperandRight(i)) {
+							i--
+						}
+					}
+
+					else {
+						while i < count && (isOperandRight(i) || !isOperandLeft(i)) {
+							i++
+						}
+					}
+
+					moved = root.anchorAt(indexBase + container.anchorCountBefore(i))
+				}
 			}
 
 			return moved
@@ -279,6 +309,7 @@ namespace Layout {
 		}
 
 		def clone Element
+		def isOperand bool
 		def anchorCount int
 		def anchorCountBefore(index int) int
 		def anchorAt(index int) Anchor
@@ -301,6 +332,16 @@ namespace Layout {
 
 		over clone Element {
 			return new(codePoint)
+		}
+
+		over isOperand bool {
+			var c = codePoint
+			return
+				c >= 'a' && c <= 'z' ||
+				c >= 'A' && c <= 'Z' ||
+				c >= 'α' && c <= 'ω' ||
+				c >= 'Α' && c <= 'Ω' ||
+				c >= '0' && c <= '9' || c == '.'
 		}
 
 		over anchorCount int {
@@ -328,7 +369,7 @@ namespace Layout {
 			}
 
 			# Add space on both sides of the glyph
-			else if codePoint in CODE_POINTS_WITH_SPACES || _isTermSeparator(previous) {
+			else if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && previous != null && previous.isOperand {
 				paddingLeft = renderer.measureGlyph(' ') * parentFontSize
 				box.width += paddingLeft * 2
 			}
@@ -351,17 +392,6 @@ namespace Layout {
 			if codePoint == '*' { return '·' }
 			return codePoint
 		}
-
-		def _isTermSeparator(previous Element) bool {
-			if codePoint != '+' && codePoint != '-' || previous == null {
-				return false
-			}
-			if previous is Character {
-				var c = (previous as Character).codePoint
-				return c != '+' && c != '-' && c != '*' && c != '÷'
-			}
-			return true
-		}
 	}
 
 	namespace Character {
@@ -380,6 +410,11 @@ namespace Layout {
 				clone.children.append(child.clone)
 			}
 			return clone
+		}
+
+		over isOperand bool {
+			assert(false)
+			return false
 		}
 
 		over anchorCount int {
@@ -478,6 +513,10 @@ namespace Layout {
 				clone.children.append(child.containerClone)
 			}
 			return clone
+		}
+
+		over isOperand bool {
+			return true
 		}
 
 		over anchorCount int {

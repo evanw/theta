@@ -1,3 +1,12 @@
+enum Platform.OS {
+	ANDROID
+	IOS
+	LINUX
+	OSX
+	UNKNOWN
+	WINDOWS
+}
+
 interface Platform.Delegate {
 	def handleFrame
 	def handleScroll(deltaX double, deltaY double)
@@ -46,6 +55,7 @@ enum Platform.Shortcut {
 }
 
 interface Platform {
+	def os OS
 	def hasFocus bool
 	def width int
 	def height int
