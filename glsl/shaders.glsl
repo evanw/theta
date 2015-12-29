@@ -82,12 +82,12 @@ export void textFragment() {
 	vec3 upperR = (valueR - lowerR) / 16.0;
 	vec3 alphaR = min(abs(upperR - lowerR), 2.0);
 
-	// Make sure to do gamma correction
-	gl_FragColor = vec4(sqrt(1.0 - vec3(
+	// Average the energy over the pixels on either side
+	gl_FragColor = vec4(1.0 - vec3(
 		alphaR.x + alphaR.y + alphaR.z,
 		alphaL.y + alphaR.x + alphaR.y,
 		alphaL.x + alphaL.y + alphaR.x
-	) / 6.0), 1.0);
+	) / 6.0, 1.0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
