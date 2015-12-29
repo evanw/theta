@@ -2,7 +2,6 @@ if TARGET == .JAVASCRIPT {
 	namespace GPU {
 		class HTMLContext :: Context {
 			var _attributeCount = 0
-			var _blendConstant double = 0.0
 			var _blendOperationMap IntMap<GLenum> = null
 			var _blendOperations = 0
 			var _comparisonMap IntMap<GLenum> = null
@@ -14,7 +13,6 @@ if TARGET == .JAVASCRIPT {
 			var _generation = 1
 			var _gl WebGLRenderingContext = null
 			var _height = 0
-			var _oldBlendConstant double = 0.0
 			var _oldBlendOperations = 0
 			var _oldTextureSet HTMLTextureSet = null
 			var _oldViewport = Rect.new
@@ -192,8 +190,8 @@ if TARGET == .JAVASCRIPT {
 				return HTMLTexture.new(self, format, width, height, pixels)
 			}
 
-			def createTextureSet(color Texture) TextureSet {
-				return HTMLTextureSet.new(self, HTMLTexture.from(color))
+			def createTextureSet(texture Texture) TextureSet {
+				return HTMLTextureSet.new(self, HTMLTexture.from(texture))
 			}
 
 			def _updateTextureSetAndViewport {
@@ -488,7 +486,7 @@ if TARGET == .JAVASCRIPT {
 			over prepare {
 				var context = HTMLContext.from(_material.context)
 				var gl = context.gl
-				assert(_texture == null || context.currentTextureSet == null || _texture != context.currentTextureSet.colorTexture)
+				assert(_texture == null || context.currentTextureSet == null || _texture != context.currentTextureSet.texture)
 				if _generation != context.generation || _isDirty {
 					gl.uniform1i(location, _index)
 					_isDirty = false
@@ -832,7 +830,7 @@ if TARGET == .JAVASCRIPT {
 
 		class HTMLTextureSet :: TextureSet {
 			var _context HTMLContext
-			var _colorTexture HTMLTexture
+			var _texture HTMLTexture
 			var _framebuffer WebGLFramebuffer = null
 			var _generation = 0
 			var _isDirty = true
@@ -842,20 +840,20 @@ if TARGET == .JAVASCRIPT {
 				return _context
 			}
 
-			def colorTexture Texture {
-				return _colorTexture
+			def texture Texture {
+				return _texture
 			}
 
 			def setColor(texture Texture) {
-				if _colorTexture != texture {
-					_colorTexture = HTMLTexture.from(texture)
+				if _texture != texture {
+					_texture = HTMLTexture.from(texture)
 					_isDirty = true
 				}
 			}
 
 			def framebuffer WebGLFramebuffer {
 				var gl = _context.gl
-				var colorTexture = _colorTexture.texture
+				var texture = _texture.texture
 
 				# Create
 				if _generation != _context.generation {
@@ -867,7 +865,7 @@ if TARGET == .JAVASCRIPT {
 				# Update
 				if _isDirty {
 					gl.bindFramebuffer(gl.FRAMEBUFFER, _framebuffer)
-					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorTexture, 0)
+					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0)
 					assert(gl.checkFramebufferStatus(gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE)
 					_isDirty = false
 				}

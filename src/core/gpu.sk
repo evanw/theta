@@ -29,7 +29,7 @@ namespace GPU {
 		def createMaterial(format VertexFormat, vertexSource string, fragmentSource string) Material
 		def createTexture(format TextureFormat, width int, height int) Texture { return createTexture(format, width, height, null) }
 		def createTexture(format TextureFormat, width int, height int, pixels Uint8Array) Texture
-		def createTextureSet(color Texture) TextureSet
+		def createTextureSet(texture Texture) TextureSet
 		def createVertexBuffer(byteCount int) VertexBuffer
 		def currentTextureSet TextureSet
 		def draw(primitive Primitive, material Material, area BufferArea)
@@ -141,7 +141,7 @@ namespace GPU {
 
 	interface TextureSet {
 		def context Context
-		def colorTexture Texture
+		def texture Texture
 		def setColor(texture Texture)
 	}
 }

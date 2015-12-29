@@ -1,8 +1,5 @@
 if TARGET == .JAVASCRIPT {
 	@import {
-		const window HTMLWindow
-		const document HTMLDocument
-
 		def requestAnimationFrame(callback fn())
 
 		type Timeout = int
@@ -456,7 +453,7 @@ if TARGET == .JAVASCRIPT {
 			}
 		}
 
-		namespace navigator {
+		class HTMLNavigator {
 			const platform string
 			const userAgent string
 		}
@@ -527,4 +524,8 @@ if TARGET == .JAVASCRIPT {
 			}
 		}
 	}
+
+	const window HTMLWindow = dynamic.this.window
+	const document HTMLDocument = dynamic.this.document
+	const navigator HTMLNavigator = dynamic.this.navigator
 }
