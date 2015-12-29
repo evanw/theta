@@ -21,6 +21,7 @@ namespace Layout {
 		CHARACTER
 		WORD
 		LINE
+		DOCUMENT
 	}
 
 	enum Behavior {
@@ -236,7 +237,11 @@ namespace Layout {
 				var deepest = expanded.deepestAnchor
 				var indexBase = expanded.relativeIndex - deepest.relativeIndex
 
-				if boundary == .LINE {
+				if boundary == .DOCUMENT {
+					moved = root.anchorAt(direction == .LEFT ? 0 : root.anchorCount - 1)
+				}
+
+				else if boundary == .LINE {
 					moved = root.anchorAt(indexBase + (direction == .LEFT ? 0 : deepest.containerElement.anchorCount - 1))
 				}
 

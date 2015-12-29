@@ -220,8 +220,10 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 			case .MOVE_RIGHT_WORD { _editor.move(.RIGHT, .WORD, .RESET) }
 			case .MOVE_LEFT_LINE { _editor.move(.LEFT, .LINE, .RESET) }
 			case .MOVE_RIGHT_LINE { _editor.move(.RIGHT, .LINE, .RESET) }
-			case .MOVE_UP { _editor.move(.LEFT, .LINE, .RESET) }
-			case .MOVE_DOWN { _editor.move(.RIGHT, .LINE, .RESET) }
+			case .MOVE_UP_LINE { _editor.move(.LEFT, .LINE, .RESET) }
+			case .MOVE_DOWN_LINE { _editor.move(.RIGHT, .LINE, .RESET) }
+			case .MOVE_UP_DOCUMENT { _editor.move(.LEFT, .DOCUMENT, .RESET) }
+			case .MOVE_DOWN_DOCUMENT { _editor.move(.RIGHT, .DOCUMENT, .RESET) }
 
 			case .EXTEND_LEFT_CHARACTER { _editor.move(.LEFT, .CHARACTER, .EXTEND) }
 			case .EXTEND_RIGHT_CHARACTER { _editor.move(.RIGHT, .CHARACTER, .EXTEND) }
@@ -229,8 +231,10 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 			case .EXTEND_RIGHT_WORD { _editor.move(.RIGHT, .WORD, .EXTEND) }
 			case .EXTEND_LEFT_LINE { _editor.move(.LEFT, .LINE, .EXTEND) }
 			case .EXTEND_RIGHT_LINE { _editor.move(.RIGHT, .LINE, .EXTEND) }
-			case .EXTEND_UP { _editor.move(.LEFT, .LINE, .EXTEND) }
-			case .EXTEND_DOWN { _editor.move(.RIGHT, .LINE, .EXTEND) }
+			case .EXTEND_UP_LINE { _editor.move(.LEFT, .LINE, .EXTEND) }
+			case .EXTEND_DOWN_LINE { _editor.move(.RIGHT, .LINE, .EXTEND) }
+			case .EXTEND_UP_DOCUMENT { _editor.move(.LEFT, .DOCUMENT, .EXTEND) }
+			case .EXTEND_DOWN_DOCUMENT { _editor.move(.RIGHT, .DOCUMENT, .EXTEND) }
 
 			case .DELETE_LEFT_CHARACTER { _editor.delete(.LEFT, .CHARACTER) }
 			case .DELETE_RIGHT_CHARACTER { _editor.delete(.RIGHT, .CHARACTER) }
