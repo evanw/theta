@@ -897,6 +897,7 @@ namespace Layout {
 		def delete(direction Direction, boundary Boundary) {
 			_recordBeforeChange
 			var insertAfterwards Container = null
+			var directionAfterwards = Direction.LEFT
 
 			# Try to create a selection to delete if nothing is selected
 			if _selection.isEmpty {
@@ -931,16 +932,40 @@ namespace Layout {
 					# Check for an anchor in a special element
 					if secondDeepest.element is Special {
 						var containers = (secondDeepest.element as Special).children
-						var container = secondDeepest.child.containerElement
+						var nestedChild = secondDeepest.child
+						var container = nestedChild.containerElement
+						assert(container in containers)
+
+						# Does the special element have children?
+						if !container.children.isEmpty {
+							var nestedChildren = container.children
+							var target = direction == .LEFT
+								? nestedChild.internalIndex > 0 ? nestedChildren[nestedChild.internalIndex - 1] : null
+								: nestedChild.internalIndex < nestedChildren.count ? nestedChildren[nestedChild.internalIndex] : null
+
+							# If the cursor moved into this element, don't also delete a non-character element
+							if target is Special {
+								needsSelection = false
+							}
+
+							# Ungroup simple groups when the boundary is deleted
+							else if target == null && containers.count == 1 {
+								insertAfterwards = container
+								directionAfterwards = direction
+							}
+						}
 
 						# Ungroup a fraction when a delete is performed in an empty child container
-						if containers.count == 2 && container.children.isEmpty {
-							assert(container in containers)
+						else if containers.count == 2 {
 							insertAfterwards = containers[1 - containers.indexOf(container)]
+							directionAfterwards = direction.opposite
 						}
 					}
 
-					_selection.move(direction, boundary, .EXTEND)
+					# Check again in case this flag was disabled
+					if needsSelection {
+						_selection.move(direction, boundary, .EXTEND)
+					}
 				}
 			}
 
@@ -949,7 +974,7 @@ namespace Layout {
 
 				# Put back content from within the deleted elements when ungrouping
 				if insertAfterwards != null {
-					_insert(insertAfterwards, direction.opposite)
+					_insert(insertAfterwards, directionAfterwards)
 				}
 
 				_applySubstitutions(_root, 0)
