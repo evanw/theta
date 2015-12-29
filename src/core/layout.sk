@@ -357,7 +357,8 @@ namespace Layout {
 				c >= 'A' && c <= 'Z' ||
 				c >= 'α' && c <= 'ω' ||
 				c >= 'Α' && c <= 'Ω' ||
-				c >= '0' && c <= '9' || c == '.'
+				c >= '0' && c <= '9' || c == '.' ||
+				c == '!'
 		}
 
 		over anchorCount int {
@@ -524,6 +525,7 @@ namespace Layout {
 
 	enum Special.Kind {
 		ABSOLUTE_VALUE
+		BRACKETS
 		CEIL
 		FLOOR
 		FRACTION
@@ -627,8 +629,8 @@ namespace Layout {
 					box.lowerHeight = (previous != null ? Math.max(0, previous.box.lowerHeight - parentFontSize * Character.LOWER_FONT_RATIO) : 0) + first.box.height
 				}
 
-				case .ABSOLUTE_VALUE, .PARENTHESES, .FLOOR, .CEIL {
-					box.width = first.box.width + fontSize * (kind == .FLOOR || kind == .CEIL ? 0.8 : 2 / 3.0)
+				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES {
+					box.width = first.box.width + fontSize * (kind == .ABSOLUTE_VALUE || kind == .PARENTHESES ? 2 / 3.0 : 0.8)
 					box.upperHeight = first.box.upperHeight
 					box.lowerHeight = first.box.lowerHeight
  				}
@@ -659,7 +661,7 @@ namespace Layout {
 					first.updateLayout(x, y + box.height - first.box.height)
 				}
 
-				case .ABSOLUTE_VALUE, .PARENTHESES, .FLOOR, .CEIL {
+				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES {
 					first.updateLayout(x + (box.width - first.box.width) / 2, y)
 				}
 			}
@@ -675,19 +677,21 @@ namespace Layout {
 					renderer.addBox(box.x + 2, box.y + box.upperHeight - 0.5, box.width - 2, 1)
 				}
 
-				case .ABSOLUTE_VALUE, .FLOOR, .CEIL {
+				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR {
 					var width = fontSize / 3
 					var y = width * 0.5
 
 					renderer.addBox(box.x + width * 0.4, box.y + y, width * 0.2, box.height - y)
 					renderer.addBox(box.x + box.width - width * 0.6, box.y + y, width * 0.2, box.height - y)
 
-					if kind == .FLOOR {
+					# Bottom bracket
+					if kind == .FLOOR || kind == .BRACKETS {
 						renderer.addBox(box.x + width * 0.6, box.y + box.height - width * 0.2, width * 0.4, width * 0.2)
 						renderer.addBox(box.x + box.width - width, box.y + box.height - width * 0.2, width * 0.4, width * 0.2)
 					}
 
-					else if kind == .CEIL {
+					# Top bracket
+					if kind == .CEIL || kind == .BRACKETS {
 						renderer.addBox(box.x + width * 0.6, box.y + y, width * 0.4, width * 0.2)
 						renderer.addBox(box.x + box.width - width, box.y + y, width * 0.4, width * 0.2)
 					}
