@@ -248,6 +248,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	def handleCodePoint(c int) {
 		var insertion = Layout.Container.new
 
+		# Fractions
 		if c == '/' {
 			_editor.selectWordBeforeSelection
 			var special = Layout.Special.new(.FRACTION)
@@ -262,12 +263,32 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 			}
 		}
 
-		else if c == '^' || c == '_' || c == '|' || c == '[' || c == '(' {
+		# Closing absolute value
+		else if c == '|' && !_editor.hasSelection && _editor.isAtEndOf(.ABSOLUTE_VALUE) && _editor.isBeforeOperand {
+			_editor.move(.RIGHT, .CHARACTER, .RESET)
+		}
+
+		# Closing brackets
+		else if (c == ']' || c == ')') && !_editor.hasSelection && _editor.isAtEndOf(c == ']' ? .BRACKETS : .PARENTHESES) {
+			_editor.move(.RIGHT, .CHARACTER, .RESET)
+		}
+
+		# Closing brackets
+		else if (c == ']' || c == ')') && !_editor.hasSelection && _editor.isBeforeOperand {
+			_editor.move(.LEFT, .WORD, .EXTEND)
+			var special = Layout.Special.new(c == ']' ? .BRACKETS : .PARENTHESES)
+			special.children.append(_editor.copy)
+			insertion.children.append(special)
+			_editor.insert(insertion)
+		}
+
+		# Opening brackets (and closing brackets when the cases above don't apply)
+		else if c == '^' || c == '_' || c == '|' || c == '[' || c == ']' || c == '(' || c == ')' {
 			var special = Layout.Special.new(
 				c == '^' ? .OVER :
 				c == '_' ? .UNDER :
 				c == '|' ? .ABSOLUTE_VALUE :
-				c == '[' ? .BRACKETS :
+				c == '[' || c == ']' ? .BRACKETS :
 				.PARENTHESES)
 			var selection = _editor.copy
 			special.children.append(selection)
@@ -279,6 +300,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 			}
 		}
 
+		# Normal characters
 		else {
 			insertion.children.append(Layout.Character.new(c))
 			_editor.insert(insertion)

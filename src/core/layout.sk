@@ -558,7 +558,7 @@ namespace Layout {
 
 	################################################################################
 
-	enum Special.Kind {
+	enum SpecialKind {
 		ABSOLUTE_VALUE
 		BRACKETS
 		CEIL
@@ -570,7 +570,7 @@ namespace Layout {
 	}
 
 	class Special : Element {
-		const kind Kind
+		const kind SpecialKind
 		const children List<Container> = []
 		var fontSize = 0.0
 
@@ -880,6 +880,30 @@ namespace Layout {
 			return _selection.extractSelection
 		}
 
+		def isBeforeOperand bool {
+			if _selection.isEmpty {
+				var deepest = _selection.start.deepestAnchor
+				return deepest.internalIndex != 0 && deepest.containerElement.children[deepest.internalIndex - 1].elementKind.isOperand
+			}
+			return false
+		}
+
+		def isAtEndOf(kind SpecialKind) bool {
+			if _selection.isEmpty {
+				var secondDeepest = _selection.start.secondDeepestAnchor
+
+				# Check for an anchor inside a special element
+				if secondDeepest.element is Special {
+					var special = secondDeepest.element as Special
+					return
+						special.kind == kind && special.children.count == 1 &&
+						secondDeepest.child.internalIndex == secondDeepest.child.containerElement.children.count
+				}
+			}
+
+			return false
+		}
+
 		def selectWordBeforeSelection {
 			if _selection.isEmpty {
 				var deepest = _selection.start.deepestAnchor
@@ -896,6 +920,7 @@ namespace Layout {
 
 		def delete(direction Direction, boundary Boundary) {
 			_recordBeforeChange
+			var changedSelection = false
 			var insertAfterwards Container = null
 			var directionAfterwards = Direction.LEFT
 
@@ -920,6 +945,7 @@ namespace Layout {
 						if containers.any(container => !container.children.isEmpty) {
 							needsSelection = !(direction == .LEFT ? containers.last : containers.first).children.isEmpty
 							_selection.changeAnchor(_root.anchorAt(anchor.relativeIndex + direction.delta))
+							changedSelection = true
 						}
 					}
 				}
@@ -979,6 +1005,11 @@ namespace Layout {
 
 				_applySubstitutions(_root, 0)
 				_commitAfterChange
+			}
+
+			# Make sure to send a notification if this ended up being just a selection change
+			else if changedSelection {
+				_notifyDelegateOfChange(.SELECTION)
 			}
 		}
 
