@@ -335,8 +335,8 @@ namespace Layout {
 	}
 
 	namespace Element {
-		const BASE_FONT_SIZE = 28
-		const MIN_FONT_SIZE = 16
+		const BASE_FONT_SIZE = 28.0
+		const MIN_FONT_SIZE = 16.0
 	}
 
 	################################################################################
@@ -523,16 +523,19 @@ namespace Layout {
 	################################################################################
 
 	enum Special.Kind {
+		ABSOLUTE_VALUE
+		CEIL
+		FLOOR
 		FRACTION
 		OVER
-		UNDER
-		ABSOLUTE_VALUE
 		PARENTHESES
+		UNDER
 	}
 
 	class Special : Element {
 		const kind Kind
 		const children List<Container> = []
+		var fontSize = 0.0
 
 		over clone Element {
 			var clone = new(kind)
@@ -580,16 +583,19 @@ namespace Layout {
 
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
 			assert(!children.isEmpty)
-			var fontSize = parentFontSize
 			var first = children[0]
 
 			switch kind {
 				case .FRACTION {
-					fontSize = Math.max(Element.MIN_FONT_SIZE, fontSize * FRACTION_FONT_RATIO)
+					fontSize = Math.max(Element.MIN_FONT_SIZE, parentFontSize * FRACTION_FONT_RATIO)
 				}
 
 				case .OVER, .UNDER {
-					fontSize = Math.max(Element.MIN_FONT_SIZE, fontSize * OVER_UNDER_FONT_RATIO)
+					fontSize = Math.max(Element.MIN_FONT_SIZE, parentFontSize * OVER_UNDER_FONT_RATIO)
+				}
+
+				default {
+					fontSize = parentFontSize
 				}
 			}
 
@@ -621,8 +627,8 @@ namespace Layout {
 					box.lowerHeight = (previous != null ? Math.max(0, previous.box.lowerHeight - parentFontSize * Character.LOWER_FONT_RATIO) : 0) + first.box.height
 				}
 
-				case .ABSOLUTE_VALUE, .PARENTHESES {
-					box.width = first.box.width + fontSize * 2 / 3
+				case .ABSOLUTE_VALUE, .PARENTHESES, .FLOOR, .CEIL {
+					box.width = first.box.width + fontSize * (kind == .FLOOR || kind == .CEIL ? 0.8 : 2 / 3.0)
 					box.upperHeight = first.box.upperHeight
 					box.lowerHeight = first.box.lowerHeight
  				}
@@ -653,7 +659,7 @@ namespace Layout {
 					first.updateLayout(x, y + box.height - first.box.height)
 				}
 
-				case .ABSOLUTE_VALUE, .PARENTHESES {
+				case .ABSOLUTE_VALUE, .PARENTHESES, .FLOOR, .CEIL {
 					first.updateLayout(x + (box.width - first.box.width) / 2, y)
 				}
 			}
@@ -669,18 +675,29 @@ namespace Layout {
 					renderer.addBox(box.x + 2, box.y + box.upperHeight - 0.5, box.width - 2, 1)
 				}
 
-				case .ABSOLUTE_VALUE {
-					var width = (box.width - children[0].box.width) / 2
+				case .ABSOLUTE_VALUE, .FLOOR, .CEIL {
+					var width = fontSize / 3
 					var y = width * 0.5
+
 					renderer.addBox(box.x + width * 0.4, box.y + y, width * 0.2, box.height - y)
 					renderer.addBox(box.x + box.width - width * 0.6, box.y + y, width * 0.2, box.height - y)
+
+					if kind == .FLOOR {
+						renderer.addBox(box.x + width * 0.6, box.y + box.height - width * 0.2, width * 0.4, width * 0.2)
+						renderer.addBox(box.x + box.width - width, box.y + box.height - width * 0.2, width * 0.4, width * 0.2)
+					}
+
+					else if kind == .CEIL {
+						renderer.addBox(box.x + width * 0.6, box.y + y, width * 0.4, width * 0.2)
+						renderer.addBox(box.x + box.width - width, box.y + y, width * 0.4, width * 0.2)
+					}
 				}
 
 				case .PARENTHESES {
 					var compiler = renderer.glyphCompiler
 					var glyph = Glyph.new
 
-					var width = (box.width - children[0].box.width) / 2
+					var width = fontSize / 3
 					var x0 = width * 0.15
 					var x1 = width * 0.4
 					var x2 = width * 0.8
@@ -975,13 +992,22 @@ namespace Layout {
 						# Substitute matching characters
 						else if codePoint != INVALID_SUBSTITUTION {
 							children.removeRange(i, j + 1)
-							if codePoint == ABSOLUTE_VALUE_SUBSTITUTION {
-								child = Special.new(.ABSOLUTE_VALUE)
+
+							# Special substitutions
+							if codePoint < 0 {
+								child = Special.new(
+									codePoint == ABSOLUTE_VALUE_SUBSTITUTION ? .ABSOLUTE_VALUE :
+									codePoint == FLOOR_SUBSTITUTION ? .FLOOR :
+									codePoint == CEIL_SUBSTITUTION ? .CEIL :
+									.PARENTHESES)
 								(child as Special).children.append(Container.new)
-							} else {
-								assert(codePoint > 0)
+							}
+
+							# Normal characters
+							else {
 								child = Character.new(codePoint)
 							}
+
 							children.insert(i, child)
 							var start = _selection.start.relativeIndex - childIndexBase
 							var end = _selection.end.relativeIndex - childIndexBase
@@ -1018,6 +1044,8 @@ namespace Layout {
 		const SKIP_SUBSTITUTION = 0
 		const INVALID_SUBSTITUTION = -1
 		const ABSOLUTE_VALUE_SUBSTITUTION = -2
+		const CEIL_SUBSTITUTION = -3
+		const FLOOR_SUBSTITUTION = -4
 		const SUBSTITUTIONS = {
 			"Alpha": 'Α',
 			"alpha": 'α',
@@ -1076,6 +1104,8 @@ namespace Layout {
 
 			# Non-character substitutions
 			"abs": ABSOLUTE_VALUE_SUBSTITUTION,
+			"ceil": CEIL_SUBSTITUTION,
+			"floor": FLOOR_SUBSTITUTION,
 		}
 	}
 }
