@@ -8,6 +8,10 @@ namespace Layout {
 		LEFT
 		RIGHT
 
+		def opposite Direction {
+			return (1 - self) as Direction
+		}
+
 		def delta int {
 			return self == LEFT ? -1 : 1
 		}
@@ -76,6 +80,15 @@ namespace Layout {
 				anchor = anchor.child
 			}
 			assert(anchor.element is Container)
+			return anchor
+		}
+
+		def secondDeepestAnchor Anchor {
+			var anchor = self
+			while anchor.child != null && anchor.child.child != null {
+				anchor = anchor.child
+			}
+			assert(anchor.child == null || anchor.child.element is Container)
 			return anchor
 		}
 	}
@@ -721,6 +734,7 @@ namespace Layout {
 			var container = copy
 			if !container.children.isEmpty {
 				_selection.delete
+				_applySubstitutions(_root, 0)
 				_commitAfterChange
 			}
 			return container
@@ -746,11 +760,63 @@ namespace Layout {
 
 		def delete(direction Direction, boundary Boundary) {
 			_recordBeforeChange
+			var insertAfterwards Container = null
+
+			# Try to create a selection to delete if nothing is selected
 			if _selection.isEmpty {
-				_selection.move(direction, boundary, .EXTEND)
+				var anchor = _selection.start
+				var deepest = anchor.deepestAnchor
+				var children = deepest.containerElement.children
+				var count = children.count
+				var needsSelection = true
+
+				# Is there something this anchor can move into?
+				if direction == .LEFT ? deepest.internalIndex > 0 : deepest.internalIndex < count {
+					var sibling = children[direction == .LEFT ? deepest.internalIndex - 1 : deepest.internalIndex]
+
+					# Descend into special elements
+					if sibling is Special {
+						var containers = (sibling as Special).children
+						assert(!containers.isEmpty)
+
+						# Only descend if it contains something
+						if containers.any(container => !container.children.isEmpty) {
+							needsSelection = !(direction == .LEFT ? containers.last : containers.first).children.isEmpty
+							_selection.changeAnchor(_root.anchorAt(anchor.relativeIndex + direction.delta))
+						}
+					}
+				}
+
+				# Create a selection by moving in the chosen direction
+				if needsSelection {
+					assert(_selection.isEmpty)
+					var secondDeepest = _selection.start.secondDeepestAnchor
+
+					# Check for an anchor in a special element
+					if secondDeepest.element is Special {
+						var containers = (secondDeepest.element as Special).children
+						var container = secondDeepest.child.containerElement
+
+						# Ungroup a fraction when a delete is performed in an empty child container
+						if containers.count == 2 && container.children.isEmpty {
+							assert(container in containers)
+							insertAfterwards = containers[1 - containers.indexOf(container)]
+						}
+					}
+
+					_selection.move(direction, boundary, .EXTEND)
+				}
 			}
+
 			if !_selection.isEmpty {
 				_selection.delete
+
+				# Put back content from within the deleted elements when ungrouping
+				if insertAfterwards != null {
+					_insert(insertAfterwards, direction.opposite)
+				}
+
+				_applySubstitutions(_root, 0)
 				_commitAfterChange
 			}
 		}
@@ -759,12 +825,18 @@ namespace Layout {
 			_recordBeforeChange
 			if !container.children.isEmpty {
 				_selection.delete
-				var clone = container.containerClone
-				var anchor = _selection.start.deepestAnchor
-				anchor.containerElement.children.insert(anchor.internalIndex, clone.children)
-				_selection.changeAnchor(_root.anchorAt(_selection.start.relativeIndex + clone.anchorCount - 1))
+				_insert(container.containerClone, .RIGHT)
 				_applySubstitutions(_root, 0)
 				_commitAfterChange
+			}
+		}
+
+		def _insert(container Container, side Direction) {
+			assert(_selection.isEmpty)
+			var anchor = _selection.start.deepestAnchor
+			anchor.containerElement.children.insert(anchor.internalIndex, container.children)
+			if side == .RIGHT {
+				_selection.changeAnchor(_root.anchorAt(_selection.start.relativeIndex + container.anchorCount - 1))
 			}
 		}
 
