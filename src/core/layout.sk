@@ -526,7 +526,8 @@ namespace Layout {
 		FRACTION
 		OVER
 		UNDER
-		GROUP
+		ABSOLUTE_VALUE
+		PARENTHESES
 	}
 
 	class Special : Element {
@@ -620,7 +621,7 @@ namespace Layout {
 					box.lowerHeight = (previous != null ? Math.max(0, previous.box.lowerHeight - parentFontSize * Character.LOWER_FONT_RATIO) : 0) + first.box.height
 				}
 
-				case .GROUP {
+				case .ABSOLUTE_VALUE, .PARENTHESES {
 					box.width = first.box.width + fontSize * 2 / 3
 					box.upperHeight = first.box.upperHeight
 					box.lowerHeight = first.box.lowerHeight
@@ -652,7 +653,7 @@ namespace Layout {
 					first.updateLayout(x, y + box.height - first.box.height)
 				}
 
-				case .GROUP {
+				case .ABSOLUTE_VALUE, .PARENTHESES {
 					first.updateLayout(x + (box.width - first.box.width) / 2, y)
 				}
 			}
@@ -668,7 +669,14 @@ namespace Layout {
 					renderer.addBox(box.x + 2, box.y + box.upperHeight - 0.5, box.width - 2, 1)
 				}
 
-				case .GROUP {
+				case .ABSOLUTE_VALUE {
+					var width = (box.width - children[0].box.width) / 2
+					var y = width * 0.5
+					renderer.addBox(box.x + width * 0.4, box.y + y, width * 0.2, box.height - y)
+					renderer.addBox(box.x + box.width - width * 0.6, box.y + y, width * 0.2, box.height - y)
+				}
+
+				case .PARENTHESES {
 					var compiler = renderer.glyphCompiler
 					var glyph = Glyph.new
 
@@ -967,7 +975,13 @@ namespace Layout {
 						# Substitute matching characters
 						else if codePoint != INVALID_SUBSTITUTION {
 							children.removeRange(i, j + 1)
-							child = Character.new(codePoint)
+							if codePoint == ABSOLUTE_VALUE_SUBSTITUTION {
+								child = Special.new(.ABSOLUTE_VALUE)
+								(child as Special).children.append(Container.new)
+							} else {
+								assert(codePoint > 0)
+								child = Character.new(codePoint)
+							}
 							children.insert(i, child)
 							var start = _selection.start.relativeIndex - childIndexBase
 							var end = _selection.end.relativeIndex - childIndexBase
@@ -1001,8 +1015,9 @@ namespace Layout {
 	}
 
 	namespace Editor {
-		const INVALID_SUBSTITUTION = -1
 		const SKIP_SUBSTITUTION = 0
+		const INVALID_SUBSTITUTION = -1
+		const ABSOLUTE_VALUE_SUBSTITUTION = -2
 		const SUBSTITUTIONS = {
 			"Alpha": 'Α',
 			"alpha": 'α',
@@ -1058,6 +1073,9 @@ namespace Layout {
 			"epsi": SKIP_SUBSTITUTION,
 			"Upsi": SKIP_SUBSTITUTION,
 			"upsi": SKIP_SUBSTITUTION,
+
+			# Non-character substitutions
+			"abs": ABSOLUTE_VALUE_SUBSTITUTION,
 		}
 	}
 }

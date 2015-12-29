@@ -262,12 +262,20 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 			}
 		}
 
-		else if codePoint == '^' || codePoint == '_' || codePoint == '(' {
-			var special = Layout.Special.new(codePoint == '^' ? .OVER : codePoint == '_' ? .UNDER : .GROUP)
-			special.children.append(_editor.copy)
+		else if codePoint == '^' || codePoint == '_' || codePoint == '|' || codePoint == '(' {
+			var special = Layout.Special.new(
+				codePoint == '^' ? .OVER :
+				codePoint == '_' ? .UNDER :
+				codePoint == '|' ? .ABSOLUTE_VALUE :
+				.PARENTHESES)
+			var selection = _editor.copy
+			special.children.append(selection)
 			c.children.append(special)
 			_editor.insert(c)
 			_editor.move(.LEFT, .CHARACTER, .RESET)
+			if !selection.children.isEmpty {
+				_editor.move(.LEFT, .LINE, .EXTEND)
+			}
 		}
 
 		else {

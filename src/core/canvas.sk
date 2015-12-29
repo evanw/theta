@@ -116,7 +116,17 @@ class Canvas :: Layout.Renderer {
 	}
 
 	def addBox(x double, y double, width double, height double) {
-		_smooth.fillRect(x, y, width, height, .BLACK)
+		var compiler = _font.glyphCompiler
+		var glyph = Glyph.new
+
+		compiler.begin(glyph)
+		compiler.moveTo(0, 0)
+		compiler.lineTo(width, 0)
+		compiler.lineTo(width, height)
+		compiler.lineTo(0, height)
+		compiler.end
+
+		addGlyph(glyph, x, y, 1)
 	}
 
 	def addSelectionBox(x double, y double, width double, height double) {
