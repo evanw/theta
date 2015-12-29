@@ -12,7 +12,7 @@ enum TriangleKind {
 
 class Font {
 	const _data DataArray
-	const _pool GPU.BufferPool
+	const _compiler GlyphCompiler
 	var ascender = 0.0
 	var descender = 0.0
 	var _scale = 0.0
@@ -20,7 +20,7 @@ class Font {
 
 	def new(data DataArray, pool GPU.BufferPool) {
 		_data = data
-		_pool = pool
+		_compiler = GlyphCompiler.new(pool)
 		_scale = 1.0 / data.readShort
 		ascender = data.readShort * _scale
 		descender = data.readShort * _scale
@@ -46,53 +46,34 @@ class Font {
 		if glyph.area == null && glyph.codePoint != ' ' {
 			var end = glyph.byteOffset + glyph.byteLength
 			var scale = _scale
-			var firstX = 0.0
-			var firstY = 0.0
-			var currentX = 0.0
-			var currentY = 0.0
-			var contourCount = 0
 
 			_data.seekTo(glyph.byteOffset)
+			_compiler.begin(glyph)
 
 			while _data.readOffset < end {
 				switch _data.readByte as Command {
 					case .MOVE_TO {
-						firstX = currentX = _data.readShort * scale
-						firstY = currentY = _data.readShort * scale
-						contourCount = 0
+						var x = _data.readShort * scale
+						var y = _data.readShort * scale
+						_compiler.moveTo(x, y)
 					}
 
 					case .LINE_TO {
 						var x = _data.readShort * scale
 						var y = _data.readShort * scale
-
-						if ++contourCount >= 2 {
-							glyph.appendTriangle(firstX, firstY, currentX, currentY, x, y, .SOLID)
-						}
-
-						currentX = x
-						currentY = y
+						_compiler.lineTo(x, y)
 					}
 
 					case .CURVE_TO {
-						var x1 = _data.readShort * scale
-						var y1 = _data.readShort * scale
+						var cx = _data.readShort * scale
+						var cy = _data.readShort * scale
 						var x = _data.readShort * scale
 						var y = _data.readShort * scale
-
-						if ++contourCount >= 2 {
-							glyph.appendTriangle(firstX, firstY, currentX, currentY, x, y, .SOLID)
-						}
-
-						glyph.appendTriangle(currentX, currentY, x1, y1, x, y, .QUADRATIC_CURVE)
-						currentX = x
-						currentY = y
+						_compiler.curveTo(cx, cy, x, y)
 					}
 
 					case .CLOSE {
-						currentX = firstX
-						currentY = firstY
-						contourCount = 0
+						_compiler.close
 					}
 
 					default {
@@ -101,7 +82,7 @@ class Font {
 				}
 			}
 
-			glyph.compile(_pool)
+			_compiler.end
 		}
 
 		return glyph
@@ -113,43 +94,97 @@ class Glyph {
 	var advanceWidth = 0.0
 	var byteOffset = 0
 	var byteLength = 0
-	var minX = Math.INFINITY
-	var minY = Math.INFINITY
-	var maxX = -Math.INFINITY
-	var maxY = -Math.INFINITY
+	var minX = 0.0
+	var minY = 0.0
+	var maxX = 0.0
+	var maxY = 0.0
 	var area GPU.BufferArea = null
 
-	def appendTriangle(ax double, ay double, bx double, by double, cx double, cy double, kind TriangleKind) {
-		switch kind {
-			case .SOLID {
-				appendVertex(ax, ay, 0, 1)
-				appendVertex(bx, by, 0, 1)
-				appendVertex(cx, cy, 0, 1)
-			}
-
-			case .QUADRATIC_CURVE {
-				appendVertex(ax, ay, 0, 0)
-				appendVertex(bx, by, 0.5, 0)
-				appendVertex(cx, cy, 1, 1)
-			}
-		}
-	}
-
-	def appendVertex(x double, y double, s double, t double) {
-		minX = Math.min(minX, x)
-		minY = Math.min(minY, y)
-		maxX = Math.max(maxX, x)
-		maxY = Math.max(maxY, y)
-		_vertices.appendFloat(x).appendFloat(y).appendFloat(s).appendFloat(t)
-	}
-
-	def compile(pool GPU.BufferPool) {
-		area = pool.allocate(VERTEX_FORMAT, _vertices.bytes)
-		_vertices.clear
+	def free {
+		area.free
+		area = null
 	}
 }
 
 namespace Glyph {
 	const VERTEX_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION4, .FLOAT, 4)
+}
+
+class GlyphCompiler {
+	const _pool GPU.BufferPool
 	const _vertices = DataArray.new
+	var _firstX = 0.0
+	var _firstY = 0.0
+	var _currentX = 0.0
+	var _currentY = 0.0
+	var _contourCount = 0
+	var _glyph Glyph = null
+
+	def begin(glyph Glyph) {
+		assert(glyph.area == null)
+		glyph.minX = glyph.minY = Math.INFINITY
+		glyph.maxX = glyph.maxY = -Math.INFINITY
+		_glyph = glyph
+		_vertices.clear
+	}
+
+	def moveTo(x double, y double) {
+		_firstX = _currentX = x
+		_firstY = _currentY = y
+		_contourCount = 0
+	}
+
+	def lineTo(x double, y double) {
+		if ++_contourCount >= 2 {
+			_appendTriangle(_firstX, _firstY, _currentX, _currentY, x, y, .SOLID)
+		}
+
+		_currentX = x
+		_currentY = y
+	}
+
+	def curveTo(cx double, cy double, x double, y double) {
+		if ++_contourCount >= 2 {
+			_appendTriangle(_firstX, _firstY, _currentX, _currentY, x, y, .SOLID)
+		}
+
+		_appendTriangle(_currentX, _currentY, cx, cy, x, y, .QUADRATIC_CURVE)
+		_currentX = x
+		_currentY = y
+	}
+
+	def close {
+		_currentX = _firstX
+		_currentY = _firstY
+		_contourCount = 0
+	}
+
+	def end {
+		_glyph.area = _pool.allocate(Glyph.VERTEX_FORMAT, _vertices.bytes)
+	}
+
+	def _appendTriangle(ax double, ay double, bx double, by double, cx double, cy double, kind TriangleKind) {
+		switch kind {
+			case .SOLID {
+				_appendVertex(ax, ay, 0, 1)
+				_appendVertex(bx, by, 0, 1)
+				_appendVertex(cx, cy, 0, 1)
+			}
+
+			case .QUADRATIC_CURVE {
+				_appendVertex(ax, ay, 0, 0)
+				_appendVertex(bx, by, 0.5, 0)
+				_appendVertex(cx, cy, 1, 1)
+			}
+		}
+	}
+
+	def _appendVertex(x double, y double, s double, t double) {
+		var glyph = _glyph
+		glyph.minX = Math.min(glyph.minX, x)
+		glyph.minY = Math.min(glyph.minY, y)
+		glyph.maxX = Math.max(glyph.maxX, x)
+		glyph.maxY = Math.max(glyph.maxY, y)
+		_vertices.appendFloat(x).appendFloat(y).appendFloat(s).appendFloat(t)
+	}
 }
