@@ -1,25 +1,30 @@
 BUILD = node_modules/.bin/skewc src --output-file=www/compiled.js
-SHADERS = src/core/shaders.sk
 
-debug: | node_modules
+default: build-glsl build-fonts build-release
+
+build-debug: | node_modules
 	$(BUILD) --inline-functions
 
-release: | node_modules
+build-release: | node_modules
 	$(BUILD) --release
 
-$(SHADERS): shaders
+build-fonts: | node_modules
+	node fonts/generate.js
 
-shaders: | node_modules
-	node_modules/.bin/glslx glsl/*.glsl --output=$(SHADERS) --format=skew
+build-glsl: | node_modules
+	node_modules/.bin/glslx glsl/shaders.glsl --output=src/core/shaders.sk --format=skew
 
 watch-debug: | node_modules
-	node_modules/.bin/watch src 'clear && make debug'
+	node_modules/.bin/watch src 'clear && make build-debug'
 
 watch-release: | node_modules
-	node_modules/.bin/watch src 'clear && make release'
+	node_modules/.bin/watch src 'clear && make build-release'
 
-watch-shaders: | node_modules
-	node_modules/.bin/watch glsl 'clear && make shaders && echo done'
+watch-fonts: | node_modules
+	node_modules/.bin/watch fonts 'clear && make build-fonts && echo done'
+
+watch-glsl: | node_modules
+	node_modules/.bin/watch glsl 'clear && make build-glsl && echo done'
 
 node_modules:
 	npm install

@@ -98,8 +98,8 @@ class Canvas :: Layout.Renderer {
 		_context.clear(.WHITE)
 	}
 
-	def glyph(codePoint int) Glyph {
-		return _font.glyph(codePoint)
+	def glyph(codePoint int, prefer Prefer) Glyph {
+		return _font.glyph(codePoint, prefer)
 	}
 
 	def addGlyph(glyph Glyph, x double, y double, scale double) {
@@ -141,17 +141,17 @@ class Canvas :: Layout.Renderer {
 		return _font.ascender - _font.descender
 	}
 
-	def _computeTextWidth(text string, scale double) double {
+	def _computeTextWidth(text string, scale double, prefer Prefer) double {
 		var width = 0.0
 		for i in 0..text.count {
-			width += scale * _font.glyph(text[i]).advanceWidth
+			width += scale * _font.glyph(text[i], prefer).advanceWidth
 		}
 		return width
 	}
 
-	def _addText(text string, x double, y double, scale double) {
+	def _addText(text string, x double, y double, scale double, prefer Prefer) {
 		for i in 0..text.count {
-			var glyph = _font.glyph(text[i])
+			var glyph = _font.glyph(text[i], prefer)
 			addGlyph(glyph, x, y, scale)
 			x += scale * glyph.advanceWidth
 		}
@@ -212,7 +212,7 @@ class Canvas :: Layout.Renderer {
 			if x != 0 {
 				_smooth.strokeLine(tx, origin.y - GRID_TICK_SIZE, tx, origin.y + GRID_TICK_SIZE, .BLACK, 2)
 			}
-			_addText(_formatNumber(x / textStep), tx + GRID_FONT_SIZE * 0.3, textY + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE)
+			_addText(_formatNumber(x / textStep), tx + GRID_FONT_SIZE * 0.3, textY + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE, .PREFER_NORMAL)
 		}
 
 		# Vertical axis
@@ -222,8 +222,8 @@ class Canvas :: Layout.Renderer {
 				var text = _formatNumber(y / textStep)
 				var ty = origin.y - y * scale / textStep
 				_smooth.strokeLine(origin.x - GRID_TICK_SIZE, ty, origin.x + GRID_TICK_SIZE, ty, .BLACK, 2)
-				_addText(text, Math.min(textX, width - _computeTextWidth(text, GRID_FONT_SIZE) - GRID_FONT_SIZE * 0.3),
-					ty + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE)
+				_addText(text, Math.min(textX, width - _computeTextWidth(text, GRID_FONT_SIZE, .PREFER_NORMAL) - GRID_FONT_SIZE * 0.3),
+					ty + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE, .PREFER_NORMAL)
 			}
 		}
 	}

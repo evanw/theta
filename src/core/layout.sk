@@ -57,7 +57,7 @@ namespace Layout {
 	interface Renderer {
 		def glyphCompiler GlyphCompiler
 		def lineHeight double
-		def glyph(codePoint int) Glyph
+		def glyph(codePoint int, prefer Prefer) Glyph
 		def addGlyph(glyph Glyph, x double, y double, scale double)
 		def addBox(x double, y double, width double, height double)
 		def addSelectionBox(x double, y double, width double, height double)
@@ -253,13 +253,15 @@ namespace Layout {
 					var i = deepest.internalIndex
 
 					if direction == .LEFT {
-						while i > 0 && (container.isOperandLeft(i) || !container.isOperandRight(i)) {
+						var kind = container.elementKindRight(i)
+						while i > 0 && container.elementKindLeft(i) == kind {
 							i--
 						}
 					}
 
 					else {
-						while i < count && (container.isOperandRight(i) || !container.isOperandLeft(i)) {
+						var kind = container.elementKindLeft(i)
+						while i < count && container.elementKindRight(i) == kind {
 							i++
 						}
 					}
@@ -277,18 +279,28 @@ namespace Layout {
 			assert(start.containerElement == end.containerElement)
 
 			var container = start.containerElement
+			var children = container.children
 			var box = container.box
 			var startX = box.x
 			var endX = box.x
 
 			# Accumulate the widths of all previous children
 			for i in 0..start.internalIndex {
-				startX += container.children[i].box.width
+				startX += children[i].box.width
 			}
 			for i in 0..end.internalIndex {
-				endX += container.children[i].box.width
+				endX += children[i].box.width
 			}
 
+			# Adjust the bounds by the padding of the characters on the ends
+			if start.internalIndex < children.count {
+				startX += children[start.internalIndex].paddingLeft
+			}
+			if end.internalIndex > 0 {
+				endX -= children[end.internalIndex - 1].paddingRight
+			}
+
+			# Render a box around everything
 			var left = Math.min(startX, endX)
 			var right = Math.max(startX, endX)
 			renderer.addSelectionBox(left, box.y, right - left, box.height)
@@ -316,8 +328,20 @@ namespace Layout {
 
 	################################################################################
 
+	enum ElementKind {
+		OTHER
+		OPERAND
+		FUNCTION
+
+		def isOperand bool {
+			return self != OTHER
+		}
+	}
+
 	class Element {
 		var box = Box.new
+		var paddingLeft = 0.0
+		var paddingRight = 0.0
 
 		def containerClone Container {
 			assert(clone is Container)
@@ -325,7 +349,7 @@ namespace Layout {
 		}
 
 		def clone Element
-		def isOperand bool
+		def elementKind ElementKind
 		def anchorCount int
 		def anchorCountBefore(index int) int
 		def anchorAt(index int) Anchor
@@ -343,22 +367,26 @@ namespace Layout {
 
 	class Character : Element {
 		const codePoint int
-		var paddingLeft = 0.0
+		var isFunction = false
 		var fontSize = 0.0
 
 		over clone Element {
-			return new(codePoint)
+			var clone = new(codePoint)
+			clone.isFunction = isFunction
+			return clone
 		}
 
-		over isOperand bool {
+		over elementKind ElementKind {
 			var c = codePoint
 			return
+				isFunction ? .FUNCTION :
 				c >= 'a' && c <= 'z' ||
 				c >= 'A' && c <= 'Z' ||
 				c >= 'α' && c <= 'ω' ||
 				c >= 'Α' && c <= 'Ω' ||
 				c >= '0' && c <= '9' || c == '.' ||
 				c == '!'
+				? .OPERAND : .OTHER
 		}
 
 		over anchorCount int {
@@ -376,21 +404,30 @@ namespace Layout {
 		}
 
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
-			box.width = renderer.glyph(codePointWithSubstitution).advanceWidth * parentFontSize
-			paddingLeft = 0
+			var previousIsFunction =
+				previous is Character ? (previous as Character).isFunction :
+				previous == null ? isFunction :
+				false
+
+			paddingLeft = paddingRight = 0
 			fontSize = parentFontSize
 
-			# Add space after the glyph
-			if codePoint == ',' {
-				box.width += renderer.glyph(' ').advanceWidth * parentFontSize
-			}
-
 			# Add space on both sides of the glyph
-			else if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && previous != null && previous.isOperand {
-				paddingLeft = renderer.glyph(' ').advanceWidth * parentFontSize
-				box.width += paddingLeft * 2
+			if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && previous != null && previous.elementKind.isOperand {
+				paddingLeft = paddingRight = renderer.glyph(' ', .PREFER_NORMAL).advanceWidth * parentFontSize
 			}
 
+			# Add space after the glyph
+			else if codePoint == ',' {
+				paddingRight = renderer.glyph(' ', .PREFER_NORMAL).advanceWidth * parentFontSize
+			}
+
+			# Add space before the glyph
+			else if isFunction != previousIsFunction && (previousIsFunction || previous.elementKind.isOperand) {
+				paddingLeft = renderer.glyph(' ', .PREFER_NORMAL).advanceWidth * parentFontSize
+			}
+
+			box.width = glyph(renderer).advanceWidth * parentFontSize + paddingLeft + paddingRight
 			box.upperHeight = renderer.lineHeight * parentFontSize * UPPER_FONT_RATIO
 			box.lowerHeight = renderer.lineHeight * parentFontSize * LOWER_FONT_RATIO
 		}
@@ -401,13 +438,11 @@ namespace Layout {
 		}
 
 		over render(renderer Renderer) {
-			renderer.addGlyph(renderer.glyph(codePointWithSubstitution), box.x + paddingLeft, box.y, fontSize)
+			renderer.addGlyph(glyph(renderer), box.x + paddingLeft, box.y, fontSize)
 		}
 
-		def codePointWithSubstitution int {
-			if codePoint == '-' { return '−' }
-			if codePoint == '*' { return '·' }
-			return codePoint
+		def glyph(renderer Renderer) Glyph {
+			return renderer.glyph(codePoint == '-' ? '−' : codePoint == '*' ? '·' : codePoint, isFunction ? .PREFER_NORMAL : .PREFER_ITALIC)
 		}
 	}
 
@@ -429,9 +464,9 @@ namespace Layout {
 			return clone
 		}
 
-		over isOperand bool {
+		over elementKind ElementKind {
 			assert(false)
-			return false
+			return .OTHER
 		}
 
 		over anchorCount int {
@@ -512,12 +547,12 @@ namespace Layout {
 			}
 		}
 
-		def isOperandLeft(index int) bool {
-			return index > 0 ? children[index - 1].isOperand : false
+		def elementKindLeft(index int) ElementKind {
+			return index > 0 ? children[index - 1].elementKind : .OTHER
 		}
 
-		def isOperandRight(index int) bool {
-			return index < children.count ? children[index].isOperand : false
+		def elementKindRight(index int) ElementKind {
+			return index < children.count ? children[index].elementKind : .OTHER
 		}
 	}
 
@@ -547,8 +582,8 @@ namespace Layout {
 			return clone
 		}
 
-		over isOperand bool {
-			return true
+		over elementKind ElementKind {
+			return .OPERAND
 		}
 
 		over anchorCount int {
@@ -610,7 +645,13 @@ namespace Layout {
 					assert(children.count == 2)
 					var second = children[1]
 
-					box.width = Math.max(first.box.width, second.box.width) + 8
+					# Add space after functions
+					paddingLeft = 0
+					if previous is Character && (previous as Character).isFunction {
+						paddingLeft = renderer.glyph(' ', .PREFER_NORMAL).advanceWidth * parentFontSize / 2
+					}
+
+					box.width = Math.max(first.box.width, second.box.width) + 8 + paddingLeft
 					box.upperHeight = first.box.height + 2
 					box.lowerHeight = second.box.height
 				}
@@ -647,8 +688,8 @@ namespace Layout {
 			switch kind {
 				case .FRACTION {
 					assert(children.count == 2)
-					first.updateLayout(x + (box.width - first.box.width) / 2, y)
-					children[1].updateLayout(x + (box.width - children[1].box.width) / 2, y + box.upperHeight)
+					first.updateLayout(x + (box.width + paddingLeft - first.box.width) / 2, y)
+					children[1].updateLayout(x + (box.width + paddingLeft - children[1].box.width) / 2, y + box.upperHeight)
 				}
 
 				case .OVER {
@@ -674,7 +715,7 @@ namespace Layout {
 
 			switch kind {
 				case .FRACTION {
-					renderer.addBox(box.x + 2, box.y + box.upperHeight - 0.5, box.width - 2, 1)
+					renderer.addBox(box.x + paddingLeft + 2, box.y + box.upperHeight - 0.5, box.width - paddingLeft - 4, 1)
 				}
 
 				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR {
@@ -842,7 +883,7 @@ namespace Layout {
 		def selectWordBeforeSelection {
 			if _selection.isEmpty {
 				var deepest = _selection.start.deepestAnchor
-				if deepest.containerElement.isOperandLeft(deepest.internalIndex) {
+				if deepest.containerElement.elementKindLeft(deepest.internalIndex).isOperand {
 					_selection.move(.LEFT, .WORD, .EXTEND)
 				}
 			}
@@ -979,6 +1020,7 @@ namespace Layout {
 
 				# Character elements
 				if child is Character && --skipCount < 0 {
+					(child as Character).isFunction = false
 					var text = ""
 					for j in i..children.count {
 						var sibling = children[j]
@@ -989,8 +1031,16 @@ namespace Layout {
 						var codePoint = SUBSTITUTIONS.get(text, INVALID_SUBSTITUTION)
 
 						# Prevent substitutions inside incomplete words
-						if codePoint == SKIP_SUBSTITUTION {
+						if codePoint == SKIP_SUBSTITUTION || codePoint == FUNCTION_SUBSTITUTION {
 							skipCount = j - i
+
+							# Mark characters that are part of a function
+							if codePoint == FUNCTION_SUBSTITUTION {
+								for k in i..j + 1 {
+									assert(children[k] is Character)
+									(children[k] as Character).isFunction = true
+								}
+							}
 						}
 
 						# Substitute matching characters
@@ -1045,11 +1095,12 @@ namespace Layout {
 	}
 
 	namespace Editor {
-		const SKIP_SUBSTITUTION = 0
-		const INVALID_SUBSTITUTION = -1
-		const ABSOLUTE_VALUE_SUBSTITUTION = -2
-		const CEIL_SUBSTITUTION = -3
-		const FLOOR_SUBSTITUTION = -4
+		const INVALID_SUBSTITUTION = 0
+		const FUNCTION_SUBSTITUTION = -1
+		const SKIP_SUBSTITUTION = -2
+		const ABSOLUTE_VALUE_SUBSTITUTION = -3
+		const CEIL_SUBSTITUTION = -4
+		const FLOOR_SUBSTITUTION = -5
 		const SUBSTITUTIONS = {
 			"Alpha": 'Α',
 			"alpha": 'α',
@@ -1105,6 +1156,26 @@ namespace Layout {
 			"epsi": SKIP_SUBSTITUTION,
 			"Upsi": SKIP_SUBSTITUTION,
 			"upsi": SKIP_SUBSTITUTION,
+
+			# Functions to recognize but not substitute
+			"acos": FUNCTION_SUBSTITUTION,
+			"acosh": FUNCTION_SUBSTITUTION,
+			"acot": FUNCTION_SUBSTITUTION,
+			"acsc": FUNCTION_SUBSTITUTION,
+			"asec": FUNCTION_SUBSTITUTION,
+			"asin": FUNCTION_SUBSTITUTION,
+			"asinh": FUNCTION_SUBSTITUTION,
+			"atan": FUNCTION_SUBSTITUTION,
+			"atanh": FUNCTION_SUBSTITUTION,
+			"cos": FUNCTION_SUBSTITUTION,
+			"cosh": FUNCTION_SUBSTITUTION,
+			"cot": FUNCTION_SUBSTITUTION,
+			"csc": FUNCTION_SUBSTITUTION,
+			"sec": FUNCTION_SUBSTITUTION,
+			"sin": FUNCTION_SUBSTITUTION,
+			"sinh": FUNCTION_SUBSTITUTION,
+			"tan": FUNCTION_SUBSTITUTION,
+			"tanh": FUNCTION_SUBSTITUTION,
 
 			# Non-character substitutions
 			"abs": ABSOLUTE_VALUE_SUBSTITUTION,

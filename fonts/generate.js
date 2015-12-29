@@ -104,6 +104,7 @@ function process(options) {
 			}
 			glyphs.push({
 				codePoint: codePoint,
+				isItalic: input.isItalic,
 				advanceWidth: glyph.advanceWidth / font.unitsPerEm,
 				path: compilePathCommands(path.commands, font.unitsPerEm),
 			});
@@ -123,7 +124,7 @@ function process(options) {
 
 	for (var i = 0; i < glyphs.length; i++) {
 		var glyph = glyphs[i];
-		shortToBytes(glyph.codePoint, bytes);
+		shortToBytes(glyph.codePoint | (glyph.isItalic ? -0x8000 : 0), bytes);
 		shortToBytes(Math.round(glyph.advanceWidth * units), bytes);
 		intToBytes(pathOffset, bytes);
 		shortToBytes(glyph.path.length, bytes);
@@ -143,19 +144,21 @@ function main() {
 		unitsPerEm: 1000,
 		inputs: [
 			{
+				path: __dirname + '/FreeSerif.ttf',
+				isItalic: false,
+				chars:
+					'abcdefghijklmnopqrstuvwxyz' +
+					'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' +
+					'0123456789' +
+					'+−·÷=<>≤≥,.! \0',
+			},
+			{
 				path: __dirname + '/FreeSerifItalic.ttf',
+				isItalic: true,
 				chars:
 					'abcdefghijklmnopqrstuvwxyz' +
 					'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
 					'αβγδεζηθικλμνξοπρστυφχψω',
-			},
-			{
-				path: __dirname + '/FreeSerif.ttf',
-				chars:
-					'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' +
-					'0123456789' +
-					'+−·÷=<>≤≥,.! \0',
-					// ⁄×√∫≠∏∑
 			},
 		],
 		output: __dirname + '/../www/fonts.bin',

@@ -10,6 +10,11 @@ enum TriangleKind {
 	QUADRATIC_CURVE
 }
 
+enum Prefer {
+	PREFER_NORMAL
+	PREFER_ITALIC
+}
+
 class Font {
 	const _data DataArray
 	const glyphCompiler GlyphCompiler
@@ -17,6 +22,7 @@ class Font {
 	var descender = 0.0
 	var _scale = 0.0
 	var _glyphs IntMap<Glyph> = {}
+	var _italicGlyphs IntMap<Glyph> = {}
 
 	def new(data DataArray, pool GPU.BufferPool) {
 		_data = data
@@ -27,21 +33,20 @@ class Font {
 
 		for i in 0..data.readShort {
 			var glyph = Glyph.new
-			glyph.codePoint = data.readShort
+			var codePoint = data.readShort
+			glyph.codePoint = codePoint & 0x7FFF
 			glyph.advanceWidth = data.readShort * _scale
 			glyph.byteOffset = data.readInt
 			glyph.byteLength = data.readShort
-			_glyphs[glyph.codePoint] = glyph
+			((codePoint & 0x8000) != 0 ? _italicGlyphs : _glyphs)[glyph.codePoint] = glyph
 		}
 	}
 
-	def glyph(codePoint int) Glyph {
-		var glyph = _glyphs.get(codePoint, null)
-
-		if glyph == null {
-			glyph = _glyphs.get(0, null)
-			assert(glyph != null)
-		}
+	def glyph(codePoint int, prefer Prefer) Glyph {
+		var glyph = (prefer == .PREFER_NORMAL ? _glyphs : _italicGlyphs).get(codePoint, null)
+		glyph ?= (prefer == .PREFER_NORMAL ? _italicGlyphs : _glyphs).get(codePoint, null)
+		glyph ?= _glyphs.get(0, null)
+		assert(glyph != null)
 
 		if glyph.area == null && glyph.codePoint != ' ' {
 			var end = glyph.byteOffset + glyph.byteLength
