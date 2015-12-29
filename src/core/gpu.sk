@@ -41,15 +41,11 @@ namespace GPU {
 		def setViewport(x int, y int, width int, height int)
 		def width int
 
-		def setBlendState(sourceColor BlendOperation, targetColor BlendOperation, sourceAlpha BlendOperation, targetAlpha BlendOperation, constant double)
-		def setCopyBlendState { setBlendState(.ONE, .ZERO, .ONE, .ZERO) }
-		def setAddBlendState { setBlendState(.ONE, .ONE, .ONE, .ONE) }
-		def setInterpolateBlendState(t double) { setBlendState(.CONSTANT, .INVERSE_CONSTANT, .CONSTANT, .INVERSE_CONSTANT, t) }
-		def setPremultipliedBlendState { setBlendState(.ONE, .INVERSE_SOURCE_ALPHA, .ONE, .INVERSE_SOURCE_ALPHA) }
-		def setUnpremultipliedBlendState { setBlendState(.SOURCE_ALPHA, .INVERSE_SOURCE_ALPHA, .SOURCE_ALPHA, .INVERSE_SOURCE_ALPHA) }
-		def setBlendState(sourceColor BlendOperation, targetColor BlendOperation, sourceAlpha BlendOperation, targetAlpha BlendOperation) {
-			setBlendState(sourceColor, targetColor, sourceAlpha, targetAlpha, 0)
-		}
+		def setBlendState(source BlendOperation, target BlendOperation)
+		def setCopyBlendState { setBlendState(.ONE, .ZERO) }
+		def setAddBlendState { setBlendState(.ONE, .ONE) }
+		def setPremultipliedBlendState { setBlendState(.ONE, .INVERSE_SOURCE_ALPHA) }
+		def setUnpremultipliedBlendState { setBlendState(.SOURCE_ALPHA, .INVERSE_SOURCE_ALPHA) }
 	}
 
 	interface Material {
@@ -112,10 +108,6 @@ namespace GPU {
 		def upload(bytes Uint8Array, byteOffset int)
 	}
 
-	enum PixelFormat {
-		RGBA_32
-	}
-
 	enum PixelFilter {
 		NEAREST
 		LINEAR
@@ -127,16 +119,15 @@ namespace GPU {
 	}
 
 	class TextureFormat {
-		const pixelFormat PixelFormat
 		const minFilter PixelFilter
 		const magFilter PixelFilter
 		const wrap PixelWrap
 	}
 
 	namespace TextureFormat {
-		const RGBA_LINEAR_CLAMP = new(.RGBA_32, .LINEAR, .LINEAR, .CLAMP)
-		const RGBA_LINEAR_MIN_NEAREST_MAG_CLAMP = new(.RGBA_32, .LINEAR, .NEAREST, .CLAMP)
-		const RGBA_NEAREST_CLAMP = new(.RGBA_32, .NEAREST, .NEAREST, .CLAMP)
+		const LINEAR_CLAMP = new(.LINEAR, .LINEAR, .CLAMP)
+		const LINEAR_MIN_NEAREST_MAG_CLAMP = new(.LINEAR, .NEAREST, .CLAMP)
+		const NEAREST_CLAMP = new(.NEAREST, .NEAREST, .CLAMP)
 	}
 
 	interface Texture {

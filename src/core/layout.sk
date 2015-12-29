@@ -230,20 +230,17 @@ namespace Layout {
 					assert(boundary == .WORD)
 
 					var container = deepest.containerElement
-					var children = container.children
-					var count = children.count
+					var count = container.children.count
 					var i = deepest.internalIndex
-					var isOperandLeft = (j int) => j > 0 ? children[j - 1].isOperand : false
-					var isOperandRight = (j int) => j < count ? children[j].isOperand : false
 
 					if direction == .LEFT {
-						while i > 0 && (isOperandLeft(i) || !isOperandRight(i)) {
+						while i > 0 && (container.isOperandLeft(i) || !container.isOperandRight(i)) {
 							i--
 						}
 					}
 
 					else {
-						while i < count && (isOperandRight(i) || !isOperandLeft(i)) {
+						while i < count && (container.isOperandRight(i) || !container.isOperandLeft(i)) {
 							i++
 						}
 					}
@@ -493,6 +490,14 @@ namespace Layout {
 				child.render(renderer)
 			}
 		}
+
+		def isOperandLeft(index int) bool {
+			return index > 0 ? children[index - 1].isOperand : false
+		}
+
+		def isOperandRight(index int) bool {
+			return index < children.count ? children[index].isOperand : false
+		}
 	}
 
 	################################################################################
@@ -723,6 +728,15 @@ namespace Layout {
 
 		def copy Container {
 			return _selection.extractSelection
+		}
+
+		def selectWordBeforeSelection {
+			if _selection.isEmpty {
+				var deepest = _selection.start.deepestAnchor
+				if deepest.containerElement.isOperandLeft(deepest.internalIndex) {
+					_selection.move(.LEFT, .WORD, .EXTEND)
+				}
+			}
 		}
 
 		def move(direction Direction, boundary Boundary, behavior Behavior) {

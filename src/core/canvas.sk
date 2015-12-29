@@ -39,7 +39,7 @@ class Canvas :: Layout.Renderer {
 		_textMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_TEXT_VERTEX, GLSLX_SOURCE_TEXT_FRAGMENT)
 		_font = Font.new(fontData, _pool)
 		_quad = _pool.allocate(QUAD_FORMAT, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
-		_color = _context.createTexture(.RGBA_NEAREST_CLAMP, 0, 0)
+		_color = _context.createTexture(.NEAREST_CLAMP, 0, 0)
 		_target = _context.createTextureSet(_color)
 		_origin.x = _platform.width / 2
 		_origin.y = _platform.height / 2
@@ -258,7 +258,7 @@ class Canvas :: Layout.Renderer {
 
 		# Composite the offscreen render target back onto the canvas using the non-zero winding rule
 		_context.setTextureSet(null)
-		_context.setBlendState(.ZERO, .SOURCE_COLOR, .ZERO, .SOURCE_COLOR)
+		_context.setBlendState(.ZERO, .SOURCE_COLOR)
 		_textMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
 		_context.draw(.TRIANGLE_STRIP, _textMaterial, _quad)
 	}
