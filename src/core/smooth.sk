@@ -156,9 +156,12 @@ class GPU.Smooth {
 				_appendPreviousVertex
 				_appendVertex(v0.x + vx, v0.y + vy, aa, 0, color)
 			} else {
-				_appendVertex(v0.x - ux - vx, v0.y - uy - vy, -aa, 0, color)
+				_appendVertex(v0.x, v0.y, aa / 2, aa / 2, color)
 				_appendPreviousVertex
-				_appendVertex(v0.x - ux + vx, v0.y - uy + vy, 0, -aa, color)
+				_appendVertex(v0.x + ux + vx, v0.y + uy + vy, 0, aa, color)
+				_appendVertex(v0.x - ux + vx, v0.y - uy + vy, 0, aa, color)
+				_appendVertex(v0.x - ux - vx, v0.y - uy - vy, 0, aa, color)
+				_appendVertex(v0.x, v0.y, aa / 2, aa / 2, color)
 				_appendVertex(v0.x + ux - vx, v0.y + uy - vy, 0, aa, color)
 				_appendVertex(v0.x + ux + vx, v0.y + uy + vy, aa, 0, color)
 			}
@@ -204,8 +207,11 @@ class GPU.Smooth {
 			} else {
 				_appendVertex(v1.x - ux - vx, v1.y - uy - vy, 0, aa, color)
 				_appendVertex(v1.x - ux + vx, v1.y - uy + vy, aa, 0, color)
-				_appendVertex(v1.x + ux - vx, v1.y + uy - vy, -aa, 0, color)
-				_appendVertex(v1.x + ux + vx, v1.y + uy + vy, 0, -aa, color)
+				_appendVertex(v1.x, v1.y, aa / 2, aa / 2, color)
+				_appendVertex(v1.x + ux + vx, v1.y + uy + vy, aa, 0, color)
+				_appendVertex(v1.x + ux - vx, v1.y + uy - vy, aa, 0, color)
+				_appendVertex(v1.x - ux - vx, v1.y - uy - vy, aa, 0, color)
+				_appendVertex(v1.x, v1.y, aa / 2, aa / 2, color)
 			}
 		}
 		_appendPreviousVertex
