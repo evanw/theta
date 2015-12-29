@@ -54,10 +54,11 @@ namespace Layout {
 	################################################################################
 
 	interface Renderer {
+		def glyphCompiler GlyphCompiler
 		def lineHeight double
-		def measureGlyph(codePoint int) double
-		def addGlyph(codePoint int, x double, y double, scale double) Glyph
-		def addLine(ax double, ay double, bx double, by double)
+		def glyph(codePoint int) Glyph
+		def addGlyph(glyph Glyph, x double, y double, scale double)
+		def addBox(x double, y double, width double, height double)
 		def addSelectionBox(x double, y double, width double, height double)
 	}
 
@@ -304,7 +305,7 @@ namespace Layout {
 				x += box.width / 2
 			}
 
-			renderer.addLine(x, box.y, x, box.y + box.height)
+			renderer.addBox(x - 0.5, box.y, 1, box.height)
 		}
 	}
 
@@ -369,18 +370,18 @@ namespace Layout {
 		}
 
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
-			box.width = renderer.measureGlyph(codePointWithSubstitution) * parentFontSize
+			box.width = renderer.glyph(codePointWithSubstitution).advanceWidth * parentFontSize
 			paddingLeft = 0
 			fontSize = parentFontSize
 
 			# Add space after the glyph
 			if codePoint == ',' {
-				box.width += renderer.measureGlyph(' ') * parentFontSize
+				box.width += renderer.glyph(' ').advanceWidth * parentFontSize
 			}
 
 			# Add space on both sides of the glyph
 			else if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && previous != null && previous.isOperand {
-				paddingLeft = renderer.measureGlyph(' ') * parentFontSize
+				paddingLeft = renderer.glyph(' ').advanceWidth * parentFontSize
 				box.width += paddingLeft * 2
 			}
 
@@ -394,7 +395,7 @@ namespace Layout {
 		}
 
 		over render(renderer Renderer) {
-			renderer.addGlyph(codePointWithSubstitution, box.x + paddingLeft, box.y, fontSize)
+			renderer.addGlyph(renderer.glyph(codePointWithSubstitution), box.x + paddingLeft, box.y, fontSize)
 		}
 
 		def codePointWithSubstitution int {
@@ -483,7 +484,8 @@ namespace Layout {
 			# If the container is empty, leave some height for the cursor
 			if children.isEmpty {
 				box.width = 4
-				box.upperHeight = box.lowerHeight = renderer.lineHeight * parentFontSize / 2
+				box.upperHeight = renderer.lineHeight * parentFontSize * Character.UPPER_FONT_RATIO
+				box.lowerHeight = renderer.lineHeight * parentFontSize * Character.LOWER_FONT_RATIO
 			}
 		}
 
@@ -519,6 +521,7 @@ namespace Layout {
 		FRACTION
 		OVER
 		UNDER
+		GROUP
 	}
 
 	class Special : Element {
@@ -570,7 +573,9 @@ namespace Layout {
 		}
 
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
+			assert(!children.isEmpty)
 			var fontSize = parentFontSize
+			var first = children[0]
 
 			switch kind {
 				case .FRACTION {
@@ -589,7 +594,6 @@ namespace Layout {
 			switch kind {
 				case .FRACTION {
 					assert(children.count == 2)
-					var first = children[0]
 					var second = children[1]
 
 					box.width = Math.max(first.box.width, second.box.width) + 8
@@ -599,39 +603,52 @@ namespace Layout {
 
 				case .OVER {
 					assert(children.count == 1)
-					box.width = children[0].box.width
-					box.upperHeight = (previous != null ? Math.max(0, previous.box.upperHeight - parentFontSize * Character.UPPER_FONT_RATIO) : 0) + children[0].box.height
+					box.width = first.box.width
+					box.upperHeight = (previous != null ? Math.max(0, previous.box.upperHeight - parentFontSize * Character.UPPER_FONT_RATIO) : 0) + first.box.height
 					box.lowerHeight = 0
 				}
 
 				case .UNDER {
 					assert(children.count == 1)
-					box.width = children[0].box.width
+					box.width = first.box.width
 					box.upperHeight = 0
-					box.lowerHeight = (previous != null ? Math.max(0, previous.box.lowerHeight - parentFontSize * Character.LOWER_FONT_RATIO) : 0) + children[0].box.height
+					box.lowerHeight = (previous != null ? Math.max(0, previous.box.lowerHeight - parentFontSize * Character.LOWER_FONT_RATIO) : 0) + first.box.height
 				}
+
+				case .GROUP {
+					box.width = first.box.width + fontSize * 2 / 3
+					box.upperHeight = first.box.upperHeight
+					box.lowerHeight = first.box.lowerHeight
+ 				}
 			}
 		}
 
 		over updateLayout(x double, y double) {
+			assert(!children.isEmpty)
+			var first = children[0]
+
 			box.x = x
 			box.y = y
 
 			switch kind {
 				case .FRACTION {
 					assert(children.count == 2)
-					children[0].updateLayout(x + (box.width - children[0].box.width) / 2, y)
+					first.updateLayout(x + (box.width - first.box.width) / 2, y)
 					children[1].updateLayout(x + (box.width - children[1].box.width) / 2, y + box.upperHeight)
 				}
 
 				case .OVER {
 					assert(children.count == 1)
-					children[0].updateLayout(x, y)
+					first.updateLayout(x, y)
 				}
 
 				case .UNDER {
 					assert(children.count == 1)
-					children[0].updateLayout(x, y + box.height - children[0].box.height)
+					first.updateLayout(x, y + box.height - first.box.height)
+				}
+
+				case .GROUP {
+					first.updateLayout(x + (box.width - first.box.width) / 2, y)
 				}
 			}
 		}
@@ -643,7 +660,51 @@ namespace Layout {
 
 			switch kind {
 				case .FRACTION {
-					renderer.addLine(box.x + 2, box.y + box.upperHeight, box.x + box.width - 2, box.y + box.upperHeight)
+					renderer.addBox(box.x + 2, box.y + box.upperHeight - 0.5, box.width - 2, 1)
+				}
+
+				case .GROUP {
+					var compiler = renderer.glyphCompiler
+					var glyph = Glyph.new
+
+					var width = (box.width - children[0].box.width) / 2
+					var x0 = width * 0.15
+					var x1 = width * 0.4
+					var x2 = width * 0.8
+					var x3 = width * 0.9
+
+					var y = width * 0.5
+					var height = box.height - y
+					var y0 = y
+					var y1 = y + height * 0.2
+					var y2 = y + height * 0.5
+					var y3 = y + height * 0.8
+					var y4 = y + height
+
+					compiler.begin(glyph)
+
+					# Left parenthesis, outer curve
+					compiler.moveTo(x2, y4)
+					compiler.curveTo(x0, y3, x0, y2)
+					compiler.curveTo(x0, y1, x2, y0)
+
+					# Left parenthesis, inner curve
+					compiler.lineTo(x3, y0)
+					compiler.curveTo(x1, y1, x1, y2)
+					compiler.curveTo(x1, y3, x3, y4)
+
+					# Right parenthesis, outer curve
+					compiler.moveTo(box.width - x3, y4)
+					compiler.curveTo(box.width - x1, y3, box.width - x1, y2)
+					compiler.curveTo(box.width - x1, y1, box.width - x3, y0)
+
+					# Right parenthesis, inner curve
+					compiler.lineTo(box.width - x2, y0)
+					compiler.curveTo(box.width - x0, y1, box.width - x0, y2)
+					compiler.curveTo(box.width - x0, y3, box.width - x2, y4)
+
+					compiler.end
+					renderer.addGlyph(glyph, box.x, box.y, 1)
 				}
 			}
 		}

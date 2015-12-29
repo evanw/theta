@@ -258,9 +258,9 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 			}
 		}
 
-		else if codePoint == '^' || codePoint == '_' {
-			var special = Layout.Special.new(codePoint == '^' ? .OVER : .UNDER)
-			special.children.append(Layout.Container.new)
+		else if codePoint == '^' || codePoint == '_' || codePoint == '(' {
+			var special = Layout.Special.new(codePoint == '^' ? .OVER : codePoint == '_' ? .UNDER : .GROUP)
+			special.children.append(_editor.copy)
 			c.children.append(special)
 			_editor.insert(c)
 			_editor.move(.LEFT, .CHARACTER, .RESET)

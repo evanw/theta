@@ -84,55 +84,66 @@ class Canvas :: Layout.Renderer {
 		_transformA.scale(2.0 / _platform.width, -2.0 / _platform.height)
 		_smooth.setTransformAndPixelScale(_transformA, 1 / _platform.density)
 
+		# Garbage collect temporary glyphs
+		for i in 0.._usedInstances {
+			var glyph = _instances[i].glyph
+			if glyph.codePoint == Glyph.TEMPORARY_CODE_POINT {
+				glyph.free
+			}
+		}
 		_usedInstances = 0
+
 		_context.setViewport(0, 0, _platform.pixelWidth, _platform.pixelHeight)
 		_context.setCopyBlendState
 		_context.clear(.WHITE)
 	}
 
-	def addGlyph(codePoint int, x double, y double, scale double) Glyph {
+	def glyph(codePoint int) Glyph {
+		return _font.glyph(codePoint)
+	}
+
+	def addGlyph(glyph Glyph, x double, y double, scale double) {
 		if _usedInstances == _instances.count {
 			_instances.append(GlyphInstance.new)
 		}
 
 		var instance = _instances[_usedInstances]
-		instance.glyph = _font.glyph(codePoint)
-		instance.offset.set(x, y + _font.ascender * scale)
+		instance.glyph = glyph
+		instance.offset.set(x, y)
 		instance.scale = scale
 		_usedInstances++
-
 		assert(_usedInstances <= _instances.count)
-		assert(instance.glyph != null)
-		return instance.glyph
 	}
 
-	def addLine(ax double, ay double, bx double, by double) {
-		_smooth.strokeLine(ax, ay, bx, by, .BLACK, 1)
+	def addBox(x double, y double, width double, height double) {
+		_smooth.fillRect(x, y, width, height, .BLACK)
 	}
 
 	def addSelectionBox(x double, y double, width double, height double) {
 		_smooth.fillRect(x, y, width, height, SELECTION_COLOR)
 	}
 
-	def lineHeight double {
-		return _font.ascender - _font.descender
+	def glyphCompiler GlyphCompiler {
+		return _font.glyphCompiler
 	}
 
-	def measureGlyph(codePoint int) double {
-		return _font.glyph(codePoint).advanceWidth
+	def lineHeight double {
+		return _font.ascender - _font.descender
 	}
 
 	def _computeTextWidth(text string, scale double) double {
 		var width = 0.0
 		for i in 0..text.count {
-			width += scale * measureGlyph(text[i])
+			width += scale * _font.glyph(text[i]).advanceWidth
 		}
 		return width
 	}
 
 	def _addText(text string, x double, y double, scale double) {
 		for i in 0..text.count {
-			x += scale * addGlyph(text[i], x, y, scale).advanceWidth
+			var glyph = _font.glyph(text[i])
+			addGlyph(glyph, x, y, scale)
+			x += scale * glyph.advanceWidth
 		}
 	}
 

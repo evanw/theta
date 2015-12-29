@@ -12,7 +12,7 @@ enum TriangleKind {
 
 class Font {
 	const _data DataArray
-	const _compiler GlyphCompiler
+	const glyphCompiler GlyphCompiler
 	var ascender = 0.0
 	var descender = 0.0
 	var _scale = 0.0
@@ -20,7 +20,7 @@ class Font {
 
 	def new(data DataArray, pool GPU.BufferPool) {
 		_data = data
-		_compiler = GlyphCompiler.new(pool)
+		glyphCompiler = GlyphCompiler.new(pool)
 		_scale = 1.0 / data.readShort
 		ascender = data.readShort * _scale
 		descender = data.readShort * _scale
@@ -48,32 +48,32 @@ class Font {
 			var scale = _scale
 
 			_data.seekTo(glyph.byteOffset)
-			_compiler.begin(glyph)
+			glyphCompiler.begin(glyph)
 
 			while _data.readOffset < end {
 				switch _data.readByte as Command {
 					case .MOVE_TO {
 						var x = _data.readShort * scale
-						var y = _data.readShort * scale
-						_compiler.moveTo(x, y)
+						var y = _data.readShort * scale + ascender
+						glyphCompiler.moveTo(x, y)
 					}
 
 					case .LINE_TO {
 						var x = _data.readShort * scale
-						var y = _data.readShort * scale
-						_compiler.lineTo(x, y)
+						var y = _data.readShort * scale + ascender
+						glyphCompiler.lineTo(x, y)
 					}
 
 					case .CURVE_TO {
 						var cx = _data.readShort * scale
-						var cy = _data.readShort * scale
+						var cy = _data.readShort * scale + ascender
 						var x = _data.readShort * scale
-						var y = _data.readShort * scale
-						_compiler.curveTo(cx, cy, x, y)
+						var y = _data.readShort * scale + ascender
+						glyphCompiler.curveTo(cx, cy, x, y)
 					}
 
 					case .CLOSE {
-						_compiler.close
+						glyphCompiler.close
 					}
 
 					default {
@@ -82,7 +82,7 @@ class Font {
 				}
 			}
 
-			_compiler.end
+			glyphCompiler.end
 		}
 
 		return glyph
@@ -90,7 +90,7 @@ class Font {
 }
 
 class Glyph {
-	var codePoint = 0
+	var codePoint = TEMPORARY_CODE_POINT
 	var advanceWidth = 0.0
 	var byteOffset = 0
 	var byteLength = 0
@@ -107,6 +107,7 @@ class Glyph {
 }
 
 namespace Glyph {
+	const TEMPORARY_CODE_POINT = -1
 	const VERTEX_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION4, .FLOAT, 4)
 }
 
