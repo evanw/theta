@@ -9,7 +9,7 @@ class Canvas :: Layout.Renderer {
 	var _context GPU.Context
 	var _pool GPU.BufferPool
 	var _smooth GPU.Smooth
-	var _demoMaterial GPU.Material
+	var _equationMaterial GPU.Material
 	var _glyphMaterial GPU.Material
 	var _textMaterial GPU.Material
 	var _font Font
@@ -20,6 +20,8 @@ class Canvas :: Layout.Renderer {
 	var _usedInstances = 0
 	var _isInvalid = true
 	var _validFrames = 0
+	var _shadeAreaUnderCurve = false
+	var _cachedEquation Equation.Node = null
 
 	# Viewport transform
 	var _origin = Vector.new
@@ -34,7 +36,6 @@ class Canvas :: Layout.Renderer {
 		_context = platform.context
 		_pool = GPU.BufferPool.new(_context)
 		_smooth = GPU.Smooth.new(_context, _pool)
-		_demoMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_DEMO_VERTEX, GLSLX_SOURCE_DEMO_FRAGMENT)
 		_glyphMaterial = _context.createMaterial(Glyph.VERTEX_FORMAT, GLSLX_SOURCE_GLYPH_VERTEX, GLSLX_SOURCE_GLYPH_FRAGMENT)
 		_textMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_TEXT_VERTEX, GLSLX_SOURCE_TEXT_FRAGMENT)
 		_font = Font.new(fontData, _pool)
@@ -233,17 +234,141 @@ class Canvas :: Layout.Renderer {
 		_smooth.flush
 	}
 
-	def drawFunction {
-		_transformA.reset
-		_transformA.scale(1 / _scale, -1 / scale)
-		_transformA.translate(-_origin.x, -_origin.y)
-		_transformA.scale(_platform.width * 0.5, -_platform.height * 0.5)
-		_transformA.translate(1, -1)
+	def _compile(node Equation.Node) string {
+		switch node.kind {
+			case .NUMBER {
+				var text = node.asDouble.toString
+				return "." in text ? text : text + ".0"
+			}
 
-		_demoMaterial.setUniformFloat(GLSLX_NAME_LINE_THICKNESS, 2 * _platform.density)
-		_demoMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformA)
-		_context.setPremultipliedBlendState
-		_context.draw(.TRIANGLE_STRIP, _demoMaterial, _quad)
+			case .FUNCTION, .SYMBOL {
+				var text = node.asString
+				return
+					text == "π" ? Math.PI.toString :
+					text == "e" ? Math.E.toString :
+					text == "θ" ? "theta" :
+					text == "ln" ? "log" :
+					text
+			}
+
+			case .EQUAL {
+				_shadeAreaUnderCurve = false
+				return "(" + _compile(node.binaryLeft) + ")-(" + _compile(node.binaryRight) + ")"
+			}
+
+			case .LESS_THAN, .LESS_THAN_EQUAL {
+				_shadeAreaUnderCurve = true
+				return "(" + _compile(node.binaryRight) + ")-(" + _compile(node.binaryLeft) + ")"
+			}
+
+			case .GREATER_THAN, .GREATER_THAN_EQUAL {
+				_shadeAreaUnderCurve = true
+				return "(" + _compile(node.binaryLeft) + ")-(" + _compile(node.binaryRight) + ")"
+			}
+
+			case .NEGATE {
+				return "-(" + _compile(node.unaryValue) + ")"
+			}
+
+			case .DIVIDE {
+				return "(" + _compile(node.binaryLeft) + ")/(" + _compile(node.binaryRight) + ")"
+			}
+
+			case .EXPONENT {
+				return "pow(" + _compile(node.binaryLeft) + "," + _compile(node.binaryRight) + ")"
+			}
+
+			case .ADD, .MULTIPLY {
+				var text = node.hasChildren ? "" : node.kind == .ADD ? "0." : "1."
+				for child = node.firstChild; child != null; child = child.nextSibling {
+					if child.previousSibling != null {
+						text += node.kind == .ADD ? "+" : "*"
+					}
+					text += "(" + _compile(child) + ")"
+				}
+				return text
+			}
+
+			case .CALL {
+				var text = _compile(node.callValue) + "("
+				for child = node.callValue.nextSibling; child != null; child = child.nextSibling {
+					text += _compile(child)
+					if child.nextSibling != null {
+						text += ","
+					}
+				}
+				return text + ")"
+			}
+		}
+
+		return "0."
+	}
+
+	def drawEquation(equation Equation.Node) {
+		if equation == null {
+			return
+		}
+
+		# Fall back to the cache for identical equations
+		if _cachedEquation == null || !_cachedEquation.equals(equation) {
+			var source = _compile(equation)
+
+			# Store a copy of the equation for comparison next time
+			_cachedEquation = equation.clone
+
+			# The compilation may fail, in which case we don't draw anything
+			_equationMaterial = null
+			try {
+				_equationMaterial = _context.createMaterial(QUAD_FORMAT,
+
+					# Vertex
+					"uniform mat3 \(GLSLX_NAME_MATRIX3);" +
+					"attribute vec2 \(GLSLX_NAME_POSITION2);" +
+					"varying vec2 _\(GLSLX_NAME_POSITION2);" +
+					"void main(){" +
+						"_\(GLSLX_NAME_POSITION2)=(\(GLSLX_NAME_MATRIX3)*vec3(\(GLSLX_NAME_POSITION2),1.)).xy;" +
+						"gl_Position=vec4(\(GLSLX_NAME_POSITION2),0.,1.);" +
+					"}",
+
+					# Fragment
+					"#extension GL_OES_standard_derivatives:enable\n" +
+					"precision highp float;" +
+					"uniform vec4 \(GLSLX_NAME_COLOR);" +
+					"uniform float line;" +
+					"varying vec2 _\(GLSLX_NAME_POSITION2);" +
+					"void main(){" +
+						"float x=_\(GLSLX_NAME_POSITION2).x," +
+						"y=_\(GLSLX_NAME_POSITION2).y," +
+						"r=sqrt(x*x+y*y)," +
+						"theta=atan(y,x)," +
+						"z=\(source)," +
+						"d=length(vec2(dFdx(z),dFdy(z)))," +
+						"e=clamp(line-abs(z)/d,0.,1.);" +
+						"if(d==0.)discard;"+
+						"gl_FragColor=\(GLSLX_NAME_COLOR)*" + (_shadeAreaUnderCurve ? "mix(e,1.,float(z>0.)*.25)" : "e") + ";" +
+					"}")
+			}
+
+			# Report the error for debugging
+			catch e dynamic {
+				console.error(e)
+			}
+		}
+
+		# Don't render anything if the compilation failed
+		if _equationMaterial != null {
+			_transformA.reset
+			_transformA.scale(1 / _scale, -1 / scale)
+			_transformA.translate(-_origin.x, -_origin.y)
+			_transformA.scale(_platform.width * 0.5, -_platform.height * 0.5)
+			_transformA.translate(1, -1)
+
+			_equationMaterial.setUniformFloat("line", 2 * _platform.density)
+			_equationMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformA)
+			_equationMaterial.setUniformVec4(GLSLX_NAME_COLOR, 0, 0.5, 1, 1)
+			_context.setPremultipliedBlendState
+			_context.draw(.TRIANGLE_STRIP, _equationMaterial, _quad)
+		}
 	}
 
 	def flushText {
@@ -269,7 +394,7 @@ class Canvas :: Layout.Renderer {
 					_transformB.translate(offset.x * scale, offset.y * scale)
 					_transformB.scale(instance.scale)
 					if j % 2 == 0 {
-						_glyphMaterial.setUniformVec3(GLSLX_NAME_COLOR, j == 0 ? 1 : 0, j == 2 ? 1 : 0, j == 4 ? 1 : 0)
+						_glyphMaterial.setUniformVec4(GLSLX_NAME_COLOR, j == 0 ? 1 : 0, j == 2 ? 1 : 0, j == 4 ? 1 : 0, 0)
 					}
 					_glyphMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformB)
 					_context.draw(.TRIANGLES, _glyphMaterial, instance.glyph.area)

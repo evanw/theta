@@ -91,11 +91,28 @@ namespace Equation {
 		var type Type = .NONE
 		var _value = 0.0
 		var _text string = null
+
+		# Hierarchy variables
 		var _parent Node = null
 		var _firstChild Node = null
 		var _lastChild Node = null
 		var _previousSibling Node = null
 		var _nextSibling Node = null
+
+		def clone Node {
+			var clone = new(kind)
+
+			clone.range = range
+			clone.type = type
+			clone._value = _value
+			clone._text = _text
+
+			for child = _firstChild; child != null; child = child._nextSibling {
+				clone.appendChild(child.clone)
+			}
+
+			return clone
+		}
 
 		def parent Node {
 			return _parent
@@ -217,6 +234,30 @@ namespace Equation {
 			_previousSibling = null
 			_nextSibling = null
 			return self
+		}
+
+		def equals(other Node) bool {
+			if kind == other.kind {
+				var a = firstChild
+				var b = other.firstChild
+
+				while a != null && b != null && a.equals(b) {
+					a = a.nextSibling
+					b = b.nextSibling
+				}
+
+				if kind == .NUMBER && asDouble != other.asDouble {
+					return false
+				}
+
+				if (kind == .FUNCTION || kind == .SYMBOL) && asString != other.asString {
+					return false
+				}
+
+				return a == null && b == null
+			}
+
+			return false
 		}
 	}
 

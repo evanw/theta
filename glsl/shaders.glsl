@@ -2,8 +2,7 @@ precision highp float;
 
 uniform sampler2D texture;
 uniform mat3 matrix3;
-uniform vec3 color;
-uniform float lineThickness;
+uniform vec4 color;
 
 attribute vec2 position2;
 attribute vec4 position4;
@@ -59,7 +58,7 @@ export void glyphFragment() {
 
 	// Upper 4 bits: front faces
 	// Lower 4 bits: back faces
-	gl_FragColor = vec4(color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0), 0.0);
+	gl_FragColor = color * (gl_FrontFacing ? 16.0 / 255.0 : 1.0 / 255.0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -88,48 +87,4 @@ export void textFragment() {
 		alphaL.y + alphaR.x + alphaR.y,
 		alphaL.x + alphaL.y + alphaR.x
 	) / 6.0, 1.0);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-export void demoVertex() {
-	_coord2 = (matrix3 * vec3(position2, 1.0)).xy;
-	gl_Position = vec4(position2, 0.0, 1.0);
-}
-
-export void demoFragment() {
-	float x = _coord2.x;
-	float y = _coord2.y;
-	float r = sqrt(x * x + y * y);
-	float theta = atan(y, x);
-
-	// float z = cos(x - sin(y)) - cos(y + sin(x));
-	float z = x * x * x - x - y;
-	// float z = y - (sin(x * 0.1) * 10.0 - sin(x));
-	// float z = y - (sin(x) + tan(x * 0.2));
-	// float z = sin(theta * 7.0) - sin(r);
-	// float z = sin(r + theta);
-	// float z = y - gamma(x + 1.0);
-	// float z = 4.0 * sin(6.0 * (theta + sin(4.0 * r) * 0.1)) - r;
-	// float z = x - y;
-
-	/*
-	float z = 0.0;
-	for (int i = 1; i < 4; i++)
-		z +=
-			cos(x * 4.0 / float(i)) +
-			sin(y * 4.0 / float(i)) +
-			sin(r * 4.0 / float(i));
-	*/
-
-	float slopeX = dFdx(z);
-	float slopeY = dFdy(z);
-	float slope = sqrt(slopeX * slopeX + slopeY * slopeY);
-	float edge = clamp(lineThickness - abs(z) / slope, 0.0, 1.0);
-	float area = float(z > 0.0); // clamp(0.5 + z / slope, 0.0, 1.0);
-
-	float alpha = mix(edge, 1.0, area * 0.25);
-	// float alpha = edge;
-
-	gl_FragColor = vec4(0.0, 0.5, 1.0, 1.0) * alpha;
 }
