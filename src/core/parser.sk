@@ -1,0 +1,538 @@
+namespace Equation {
+	enum TokenKind {
+		CODE_POINT
+		END_OF_INPUT
+		OPERAND
+		OVER
+		UNDER
+	}
+
+	enum Precedence {
+		LOWEST
+		TUPLE
+		EQUAL
+		ADD
+		MULTIPLY
+		PREFIX
+		POSTFIX
+	}
+
+	################################################################################
+
+	class Token {
+		const kind TokenKind
+		const range Range
+		const codePoint int
+		const node Node
+
+		def isParenthesizedOperand bool {
+			return kind == .OPERAND && codePoint == PARENTHESIZED_CODE_POINT
+		}
+
+		def isWord bool {
+			return kind == .CODE_POINT && Glyph.isWordCodePoint(codePoint)
+		}
+
+		def isNumber bool {
+			return kind == .CODE_POINT && (codePoint >= '0' && codePoint <= '9' || codePoint == '.')
+		}
+	}
+
+	namespace Token {
+		const PARENTHESIZED_CODE_POINT = 1
+	}
+
+	################################################################################
+
+	class ParserContext {
+		const log Log
+		const _tokens List<Token>
+		var _index = 0
+
+		def current Token {
+			return _tokens[_index]
+		}
+
+		def next Token {
+			var token = current
+			if _index + 1 < _tokens.count {
+				_index++
+			}
+			return token
+		}
+
+		def peek(codePoint int) bool {
+			var token = current
+			return token.kind == .CODE_POINT && token.codePoint == codePoint
+		}
+
+		def eat(codePoint int) bool {
+			if peek(codePoint) {
+				next
+				return true
+			}
+			return false
+		}
+
+		def hasMoreTokens bool {
+			return current.kind != .END_OF_INPUT
+		}
+
+		def unexpectedToken {
+			log.syntaxErrorUnexpectedToken(current)
+		}
+	}
+
+	################################################################################
+
+	class Diagnostic {
+		const range Range
+		const message string
+	}
+
+	class Log {
+		var _errors List<Diagnostic> = []
+
+		def errors List<Diagnostic> {
+			return _errors
+		}
+
+		def clear {
+			_errors = []
+		}
+
+		def error(range Range, message string) {
+			_errors.append(Diagnostic.new(range, message))
+		}
+
+		def syntaxErrorUnexpectedToken(token Token) {
+			error(token.range, "Unexpected " + (
+				token.kind == .CODE_POINT ? "\"" + string.fromCodePoint(token.codePoint) + "\"" :
+				token.kind == .END_OF_INPUT ? "end of input" :
+				token.kind == .OVER ? "exponent" :
+				token.kind == .UNDER ? "subscript" :
+				"expression"))
+		}
+	}
+
+	################################################################################
+
+	class Parser {
+		var _log Log
+
+		def parse(container Layout.Container) Node {
+			return _tokenizeAndParse(container, 0, .TUPLE)
+		}
+
+		def _prefix(context ParserContext) Node {
+			var token = context.current
+
+			# Operand tokens
+			if token.kind == .OPERAND {
+				context.next
+
+				# All functions must be called
+				if token.node.kind == .FUNCTION {
+					# Handle an exponent on the function itself
+					var power = context.current
+					if power.kind == .OVER {
+						context.next
+					} else {
+						power = null
+					}
+
+					# Special-case "-1" to mean calling the inverse function
+					var isInverse = power != null && power.node.kind == .NUMBER && power.node.asDouble == -1
+					var call = Node.createCall(isInverse ? Node.createUnary(.INVERSE, token.node).withRange(token.range) : token.node)
+
+					# Handle a single argument (check for a parenthesized operand first to differentiate "sin(x^2)" from "sin(x)^2")
+					var hasExplicitParentheses = context.current.isParenthesizedOperand
+					var argument = hasExplicitParentheses ? context.next.node : _parse(context, .MULTIPLY)
+					if argument == null {
+						return null
+					}
+
+					# Handle implicit compound arguments ("sin 2x cos -3y - tan 4z*5" => "sin(2x) cos(-3y) - tan(4z)*5")
+					if !hasExplicitParentheses {
+						while context.current.kind == .OPERAND && context.current.node.kind != .FUNCTION {
+							var right = _parse(context, .MULTIPLY)
+							if right == null {
+								return null
+							}
+							argument = _join(.MULTIPLY, argument, right)
+						}
+					}
+
+					# Handle multiple arguments
+					if argument.kind == .TUPLE {
+						call.appendChildrenFrom(argument)
+					} else {
+						call.appendChild(argument)
+					}
+					call.withRangeFromChildren
+
+					# Handle an exponent on the function itself
+					if power != null && !isInverse {
+						call = Node.createBinary(.EXPONENT, call, power.node).withRange(call.range)
+					}
+
+					return call
+				}
+
+				return token.node
+			}
+
+			# Code point tokens
+			if token.kind == .CODE_POINT {
+				context.next
+
+				switch token.codePoint {
+					case '+' {
+						return _parse(context, .PREFIX)
+					}
+
+					case '-' {
+						var value = _parse(context, .PREFIX)
+						if value == null {
+							return null
+						}
+
+						# Automatically update the sign of numeric literals in place
+						return _negate(value).withRange(Range.span(token.range, value.range))
+					}
+				}
+			}
+
+			context.unexpectedToken
+			return null
+		}
+
+		def _infix(context ParserContext, left Node, precedence Precedence) Node {
+			var token = context.current
+			var c = token.codePoint
+
+			# Operand tokens
+			if token.kind == .OPERAND {
+				var right = _parse(context, .MULTIPLY)
+				if right == null {
+					return null
+				}
+				return _join(.MULTIPLY, left, right)
+			}
+
+			# Code point tokens
+			if token.kind == .CODE_POINT {
+				context.next
+
+				switch c {
+					case '!' {
+						return Node.createUnary(.FACTORIAL, left).withRange(Range.span(left.range, token.range))
+					}
+
+					case '*' {
+						var right = _parse(context, .MULTIPLY)
+						if right == null {
+							return null
+						}
+						return _join(.MULTIPLY, left, right)
+					}
+
+					case ',' {
+						left = Node.createTuple.appendChild(left)
+						while true {
+							var right = _parse(context, .TUPLE)
+							if right == null {
+								return null
+							}
+							left.appendChild(right)
+							if !context.eat(',') {
+								break
+							}
+						}
+						return left.withRangeFromChildren
+					}
+
+					case '=', '<', '>', '≤', '≥', '÷' {
+						var right = _parse(context, c == '÷' ? .MULTIPLY : .EQUAL)
+						if right == null {
+							return null
+						}
+						return Node.createBinary(
+							c == '<' ? .LESS_THAN :
+							c == '>' ? .GREATER_THAN :
+							c == '≤' ? .LESS_THAN_EQUAL :
+							c == '≥' ? .GREATER_THAN_EQUAL :
+							c == '÷' ? .DIVIDE :
+							.EQUAL, left, right).withRangeFromChildren
+					}
+
+					case '+', '-' {
+						var right = _parse(context, .ADD)
+						if right == null {
+							return null
+						}
+						if c == '-' {
+							right = _negate(right).withRange(Range.span(token.range, right.range))
+						}
+						return _join(.ADD, left, right)
+					}
+				}
+			}
+
+			# Over tokens
+			if token.kind == .OVER {
+				context.next
+				return Node.createBinary(.EXPONENT, left, token.node).withRangeFromChildren
+			}
+
+			context.unexpectedToken
+			return null
+		}
+
+		def _tokenizeAndParse(container Layout.Container, baseIndex int, precedence Precedence) Node {
+			var context = _tokenize(container, baseIndex)
+			var node = _parse(context, precedence)
+
+			# Make sure everything was parsed
+			if node != null && context.hasMoreTokens {
+				context.unexpectedToken
+			}
+
+			return node ?? Node.createError.withRange(Range.new(baseIndex, baseIndex + container.anchorCount - 1))
+		}
+
+		def _isValidInfix(token Token, precedence Precedence) bool {
+			switch token.kind {
+				case .CODE_POINT {
+					switch token.codePoint {
+						case '=', '<', '>', '≤', '≥' { return precedence < Precedence.EQUAL }
+						case '+', '-' { return precedence < Precedence.ADD }
+						case '*', '÷' { return precedence < Precedence.MULTIPLY }
+						case '!' { return precedence < Precedence.POSTFIX }
+						case ',' { return precedence < Precedence.TUPLE }
+					}
+				}
+				case .END_OF_INPUT {}
+				case .OPERAND { return precedence < Precedence.MULTIPLY }
+				case .OVER, .UNDER { return precedence < Precedence.POSTFIX }
+				default { assert(false) }
+			}
+			return false
+		}
+
+		# A Pratt parser is a parser that associates up to two operations per token,
+		# each with its own precedence. Pratt parsers excel at parsing expression
+		# trees with deeply nested precedence levels. For an excellent writeup, see:
+		#
+		#   http://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/
+		#
+		def _parse(context ParserContext, precedence Precedence) Node {
+			# Prefix
+			var node = _prefix(context)
+			assert(node == null || node.range != null) # All parsed nodes must have a valid range set
+
+			# Infix
+			while node != null && _isValidInfix(context.current, precedence) {
+				node = _infix(context, node, precedence)
+				assert(node == null || node.range != null) # All parsed nodes must have a valid range set
+			}
+
+			return node
+		}
+
+		def _tokenize(container Layout.Container, baseIndex int) ParserContext {
+			var tokens List<Token> = []
+
+			# Start off with a simple 1:1 conversion of elements to tokens
+			for child in container.children {
+				var nextBaseIndex = baseIndex + 1 + child.anchorCount
+				var range = Range.new(baseIndex, nextBaseIndex)
+				var kind TokenKind
+				var codePoint = 0
+				var node Node = null
+
+				# Character elements
+				if child is Layout.Character {
+					kind = .CODE_POINT
+					codePoint = (child as Layout.Character).codePoint
+				}
+
+				# Special elements
+				else {
+					assert(child is Layout.Special)
+					var special = child as Layout.Special
+					var containers = special.children
+					assert(!containers.isEmpty)
+					var first = _tokenizeAndParse(containers[0], baseIndex + 1, special.kind == .PARENTHESES ? .LOWEST : .TUPLE)
+
+					switch special.kind {
+						case .FRACTION {
+							assert(containers.count == 2)
+							kind = .OPERAND
+							node = Node.createBinary(.DIVIDE, first, _tokenizeAndParse(containers[1], baseIndex + 1, .TUPLE)).withRange(range)
+						}
+
+						case .OVER {
+							assert(containers.count == 1)
+							kind = .OVER
+							node = first
+						}
+
+						case .UNDER {
+							assert(containers.count == 1)
+							kind = .UNDER
+							node = first
+						}
+
+						case .PARENTHESES, .BRACKETS {
+							assert(containers.count == 1)
+							kind = .OPERAND
+							node = first
+							codePoint = Token.PARENTHESIZED_CODE_POINT
+						}
+
+						case .ABSOLUTE_VALUE {
+							assert(containers.count == 1)
+							kind = .OPERAND
+							node = Node.createCall(Node.createSymbol("abs").withRange(range)).appendChild(first).withRange(range)
+						}
+
+						case .CEIL {
+							assert(containers.count == 1)
+							kind = .OPERAND
+							node = Node.createCall(Node.createSymbol("ceil").withRange(range)).appendChild(first).withRange(range)
+						}
+
+						case .FLOOR {
+							assert(containers.count == 1)
+							kind = .OPERAND
+							node = Node.createCall(Node.createSymbol("floor").withRange(range)).appendChild(first).withRange(range)
+						}
+					}
+				}
+
+				tokens.append(Token.new(kind, range, codePoint, node))
+				baseIndex = nextBaseIndex
+			}
+
+			# Next, convert runs of tokens to words and numbers
+			var i = 0
+			while i < tokens.count {
+				var token = tokens[i]
+
+				# Check for words
+				if token.isWord {
+					var text = ""
+					var match string = null
+					var matchCount = 0
+
+					for j in i..tokens.count {
+						var other = tokens[j]
+
+						if !other.isWord {
+							break
+						}
+
+						text += string.fromCodePoint(other.codePoint)
+
+						# Always match at least a single character word
+						if matchCount == 0 || text in FUNCTIONS {
+							match = text
+							matchCount = j - i + 1
+						}
+					}
+
+					if matchCount != 0 {
+						var range = Range.span(token.range, tokens[i + matchCount - 1].range)
+						token = Token.new(.OPERAND, range, 0, (matchCount != 1 ? Node.createFunction(match) : Node.createSymbol(match)).withRange(range))
+						tokens.removeRange(i, i + matchCount)
+						tokens.insert(i, token)
+					}
+				}
+
+				# Check for numbers
+				else if token.isNumber {
+					var text = ""
+					var foundDot = false
+					var j = i
+
+					while j < tokens.count {
+						var other = tokens[j]
+
+						if !other.isNumber {
+							break
+						}
+
+						# Only one decimal point is allowed
+						if other.codePoint == '.' {
+							if foundDot {
+								break
+							}
+							foundDot = true
+						}
+
+						text += string.fromCodePoint(other.codePoint)
+						j++
+					}
+
+					if text != "." {
+						var range = Range.span(token.range, tokens[j - 1].range)
+						token = Token.new(.OPERAND, range, 0, Node.createNumber(+(text as dynamic)).withRange(range))
+						tokens.removeRange(i, j)
+						tokens.insert(i, token)
+					}
+				}
+
+				i++
+			}
+
+			# Every token stream must end in an "end of input" token
+			baseIndex++
+			tokens.append(Token.new(.END_OF_INPUT, Range.new(baseIndex, baseIndex), 0, null))
+
+			return ParserContext.new(_log, tokens)
+		}
+	}
+
+	namespace Parser {
+		const FUNCTIONS = {
+			"acos": 0,
+			"acosh": 0,
+			"acot": 0,
+			"acsc": 0,
+			"asec": 0,
+			"asin": 0,
+			"asinh": 0,
+			"atan": 0,
+			"atanh": 0,
+			"cos": 0,
+			"cosh": 0,
+			"cot": 0,
+			"csc": 0,
+			"sec": 0,
+			"sin": 0,
+			"sinh": 0,
+			"tan": 0,
+			"tanh": 0,
+		}
+
+		def _negate(value Node) Node {
+			if value.kind == .NUMBER {
+				return value.withValue(-value.asDouble)
+			}
+			return Node.createUnary(.NEGATE, value)
+		}
+
+		def _join(kind NodeKind, left Node, right Node) Node {
+			if left.kind != kind {
+				left = Node.new(kind).appendChild(left).withRange(left.range)
+			}
+			if right.kind == kind {
+				left.appendChildrenFrom(right)
+			} else {
+				left.appendChild(right)
+			}
+			return left.withRange(Range.span(left.range, right.range))
+		}
+	}
+}

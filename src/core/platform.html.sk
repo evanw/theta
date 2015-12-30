@@ -247,14 +247,12 @@ class HTMLPlatform :: Platform {
 
 		document.addEventListener("keypress", (e HTMLKeyboardEvent) => {
 			var c = e.which
-			if _delegate != null && (
-				c >= 'a' && c <= 'z' ||
-				c >= 'A' && c <= 'Z' ||
-				c >= 'α' && c <= 'ω' ||
-				c >= 'Α' && c <= 'Ω' ||
+			if _delegate != null && !(isOSX ? e.metaKey : e.ctrlKey) && (
+				Glyph.isWordCodePoint(c) ||
 				c >= '0' && c <= '9' ||
 				string.fromCodePoint(c) in ".<>≤≥=+-*/÷√()[]^_,!|"
 			) {
+				e.preventDefault
 				_delegate.handleCodePoint(c)
 			}
 		})

@@ -1,0 +1,319 @@
+namespace Equation {
+	enum NodeKind {
+		# Operand
+		ERROR
+		FUNCTION
+		NUMBER
+		SYMBOL
+
+		# Unary
+		FACTORIAL
+		INVERSE
+		NEGATE
+
+		# Binary
+		DIVIDE
+		EQUAL
+		EXPONENT
+		GREATER_THAN
+		GREATER_THAN_EQUAL
+		LESS_THAN
+		LESS_THAN_EQUAL
+
+		# N-ary
+		ADD
+		CALL
+		MULTIPLY
+		TUPLE
+
+		def isOperand bool {
+			return self >= ERROR && self <= SYMBOL
+		}
+
+		def isUnary bool {
+			return self >= FACTORIAL && self <= NEGATE
+		}
+
+		def isBinary bool {
+			return self >= DIVIDE && self <= LESS_THAN_EQUAL
+		}
+	}
+
+	class Range {
+		const start int
+		const end int
+	}
+
+	namespace Range {
+		def span(start Range, end Range) Range {
+			if start == null { return end }
+			if end == null { return start }
+			assert(start.start <= end.end)
+			return Range.new(start.start, end.end)
+		}
+	}
+
+	type Type : int {
+		def isTuple bool {
+			return (self as int) > 1
+		}
+
+		def tupleCount int {
+			assert(isTuple)
+			return self as int
+		}
+
+		def toString string {
+			if self == NONE { return "none" }
+			if self == BOOLEAN { return "boolean" }
+			if self == NUMBER { return "number" }
+			if self == FUNCTION { return "function" }
+			assert(isTuple)
+			return "\(tupleCount)-tuple"
+		}
+	}
+
+	namespace Type {
+		const NONE = 0 as Type
+		const BOOLEAN = -1 as Type
+		const FUNCTION = -2 as Type
+		const NUMBER = 1 as Type
+
+		def tuple(x int) Type {
+			assert(x > 1)
+			return x as Type
+		}
+	}
+
+	class Node {
+		var kind NodeKind
+		var range Range = null
+		var type Type = .NONE
+		var _value = 0.0
+		var _text string = null
+		var _parent Node = null
+		var _firstChild Node = null
+		var _lastChild Node = null
+		var _previousSibling Node = null
+		var _nextSibling Node = null
+
+		def parent Node {
+			return _parent
+		}
+
+		def firstChild Node {
+			return _firstChild
+		}
+
+		def lastChild Node {
+			return _lastChild
+		}
+
+		def previousSibling Node {
+			return _previousSibling
+		}
+
+		def nextSibling Node {
+			return _nextSibling
+		}
+
+		# This is cheaper than childCount == 0
+		def hasChildren bool {
+			return _firstChild != null
+		}
+
+		# This is cheaper than childCount == 1
+		def hasOneChild bool {
+			return hasChildren && _firstChild == _lastChild
+		}
+
+		def childCount int {
+			var count = 0
+			for child = _firstChild; child != null; child = child._nextSibling {
+				count++
+			}
+			return count
+		}
+
+		def withValue(value double) Node {
+			assert(kind == .NUMBER)
+			_value = value
+			return self
+		}
+
+		def withText(value string) Node {
+			assert(kind == .FUNCTION || kind == .SYMBOL)
+			_text = value
+			return self
+		}
+
+		def withType(value Type) Node {
+			type = value
+			return self
+		}
+
+		def withRange(value Range) Node {
+			range = value
+			return self
+		}
+
+		def withRangeFromChildren Node {
+			range = Range.span(firstChild.range, lastChild.range)
+			return self
+		}
+
+		def appendChild(node Node) Node {
+			if node == null {
+				return self
+			}
+
+			assert(node != self)
+			assert(node._parent == null)
+			assert(node._previousSibling == null)
+			assert(node._nextSibling == null)
+			node._parent = self
+
+			if hasChildren {
+				node._previousSibling = _lastChild
+				_lastChild._nextSibling = node
+				_lastChild = node
+			} else {
+				_lastChild = _firstChild = node
+			}
+
+			return self
+		}
+
+    def appendChildrenFrom(node Node) Node {
+      assert(node != self)
+
+      while node.hasChildren {
+        appendChild(node._firstChild.remove)
+      }
+
+      return self
+    }
+
+		def remove Node {
+			assert(_parent != null)
+
+			if _previousSibling != null {
+				assert(_previousSibling._nextSibling == self)
+				_previousSibling._nextSibling = _nextSibling
+			} else {
+				assert(_parent._firstChild == self)
+				_parent._firstChild = _nextSibling
+			}
+
+			if _nextSibling != null {
+				assert(_nextSibling._previousSibling == self)
+				_nextSibling._previousSibling = _previousSibling
+			} else {
+				assert(_parent._lastChild == self)
+				_parent._lastChild = _previousSibling
+			}
+
+			_parent = null
+			_previousSibling = null
+			_nextSibling = null
+			return self
+		}
+	}
+
+	class Node {
+		def asDouble double {
+			assert(kind == .NUMBER)
+			return _value
+		}
+
+		def asString string {
+			assert(kind == .FUNCTION || kind == .SYMBOL)
+			return _text
+		}
+
+		def unaryValue Node {
+			assert(kind.isUnary)
+			assert(childCount == 1)
+			return _firstChild
+		}
+
+		def binaryLeft Node {
+			assert(kind.isBinary)
+			assert(childCount == 2)
+			return _firstChild
+		}
+
+		def binaryRight Node {
+			assert(kind.isBinary)
+			assert(childCount == 2)
+			return _lastChild
+		}
+
+		def callValue Node {
+			assert(kind == .CALL)
+			assert(childCount >= 1)
+			return _firstChild
+		}
+
+		# This is just for debugging
+		def toString string {
+			if kind == .NUMBER { return asDouble.toString }
+			if kind == .FUNCTION || kind == .SYMBOL { return asString }
+
+			# Use nested S-expressions for display
+			var text = kind.toString
+			if hasChildren {
+				text = "(" + text
+				for child = firstChild; child != null; child = child.nextSibling {
+					text += child.kind.isOperand ? " " + child.toString : "\n  " + "\n  ".join(child.toString.split("\n"))
+				}
+				text += ")"
+			}
+			return text
+		}
+	}
+
+	namespace Node {
+		def createError Node {
+			return new(.ERROR)
+		}
+
+		def createFunction(text string) Node {
+			return new(.FUNCTION).withText(text)
+		}
+
+		def createNumber(value double) Node {
+			return new(.NUMBER).withValue(value).withType(.NUMBER)
+		}
+
+		def createSymbol(text string) Node {
+			return new(.SYMBOL).withText(text)
+		}
+
+		def createUnary(kind NodeKind, value Node) Node {
+			assert(kind.isUnary)
+			return new(kind).appendChild(value)
+		}
+
+		def createBinary(kind NodeKind, left Node, right Node) Node {
+			assert(kind.isBinary)
+			return new(kind).appendChild(left).appendChild(right)
+		}
+
+		def createAdd Node {
+			return new(.ADD)
+		}
+
+		def createCall(value Node) Node {
+			return new(.CALL).appendChild(value)
+		}
+
+		def createMultiply Node {
+			return new(.MULTIPLY)
+		}
+
+		def createTuple Node {
+			return new(.TUPLE)
+		}
+	}
+}

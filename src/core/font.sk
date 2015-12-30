@@ -114,6 +114,14 @@ class Glyph {
 namespace Glyph {
 	const TEMPORARY_CODE_POINT = -1
 	const VERTEX_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION4, .FLOAT, 4)
+
+	def isWordCodePoint(c int) bool {
+		return
+			c >= 'a' && c <= 'z' ||
+			c >= 'A' && c <= 'Z' ||
+			c >= 'α' && c <= 'ω' ||
+			c >= 'Α' && c <= 'Ω'
+	}
 }
 
 class GlyphCompiler {

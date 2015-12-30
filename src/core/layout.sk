@@ -387,10 +387,7 @@ namespace Layout {
 			var c = codePoint
 			return
 				isFunction ? .FUNCTION :
-				c >= 'a' && c <= 'z' ||
-				c >= 'A' && c <= 'Z' ||
-				c >= 'α' && c <= 'ω' ||
-				c >= 'Α' && c <= 'Ω' ||
+				Glyph.isWordCodePoint(c) ||
 				c >= '0' && c <= '9' || c == '.' ||
 				c == '!'
 				? .OPERAND : .OTHER
@@ -687,8 +684,8 @@ namespace Layout {
 				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES {
 					assert(children.count == 1)
 					return
-						x < firstBox.x ? -1 :
-						x > firstBox.x + firstBox.width ? anchorCount :
+						x < (box.x + firstBox.x) / 2 ? -1 :
+						x > (box.x + box.width + firstBox.x + firstBox.width) / 2 ? anchorCount :
 						first.anchorIndexFromPoint(x, y)
 				}
 			}
@@ -935,6 +932,10 @@ namespace Layout {
 				var state = _history[++_historyIndex]
 				_restore(state, state.redoSelection)
 			}
+		}
+
+		def cloneContents Container {
+			return _root.containerClone
 		}
 
 		def resetHistory {

@@ -22,6 +22,8 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	var _platform Platform
 	var _canvas Canvas
 	var _editor Layout.Editor
+	var _parser Equation.Parser
+	var _log = Equation.Log.new
 	var _fps = 60.0
 	var _cursorToggleTime = 0.0
 	var _isCursorVisible = true
@@ -48,6 +50,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_platform = platform
 		_canvas = Canvas.new(platform, fontData)
 		_editor = Layout.Editor.new(_canvas, EDITOR_PADDING, EDITOR_PADDING)
+		_parser = Equation.Parser.new(_log)
 		_createInitialContent
 		_resetCursorBlink
 		platform.setDelegate(self)
@@ -367,6 +370,14 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 
 	def handleEditorChange(change Layout.Editor.Change) {
 		_resetCursorBlink
+		if change == .CONTENTS {
+			_recompile
+		}
+	}
+
+	def _recompile {
+		_log.clear
+		_parser.parse(_editor.cloneContents)
 	}
 
 	def _invalidate {
