@@ -13,6 +13,12 @@ flags Platform.Buttons {
 	MIDDLE
 }
 
+enum Platform.Cursor {
+	DEFAULT
+	MOVE
+	TEXT
+}
+
 interface Platform.Delegate {
 	def handleFrame
 	def handleScroll(deltaX double, deltaY double)
@@ -78,4 +84,5 @@ interface Platform {
 	def seconds double
 	def context GPU.Context
 	def setDelegate(delegate Delegate)
+	def setCursor(cursor Cursor)
 }

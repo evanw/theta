@@ -321,6 +321,13 @@ class HTMLPlatform :: Platform {
 		_delegate = delegate
 	}
 
+	def setCursor(cursor Platform.Cursor) {
+		document.body.style.cursor =
+			cursor == .MOVE ? "move" :
+			cursor == .TEXT ? "text" :
+			"default"
+	}
+
 	def _computeCentroid(touches List<HTMLTouch>, centroid Vector) {
 		centroid.set(0, 0)
 		for touch in touches {

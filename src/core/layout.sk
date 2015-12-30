@@ -413,7 +413,7 @@ namespace Layout {
 			fontSize = parentFontSize
 
 			# Add space on both sides of the glyph
-			if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && previous != null && previous.elementKind.isOperand {
+			if codePoint in CODE_POINTS_WITH_SPACES || (codePoint == '+' || codePoint == '-') && previous != null && previous.elementKind == .OPERAND {
 				paddingLeft = paddingRight = renderer.glyph(' ', .PREFER_NORMAL).advanceWidth * parentFontSize
 			}
 

@@ -189,6 +189,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	def handleMouseDown(x int, y int, buttons Platform.Buttons) {
 		_oldMouseX = x
 		_oldMouseY = y
+		_platform.setCursor(.MOVE)
 	}
 
 	def handleMouseMove(x int, y int, buttons Platform.Buttons) {
@@ -201,6 +202,9 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	}
 
 	def handleMouseUp(x int, y int, buttons Platform.Buttons) {
+		if buttons == 0 {
+			_platform.setCursor(.DEFAULT)
+		}
 		_oldMouseX = x
 		_oldMouseY = y
 	}
