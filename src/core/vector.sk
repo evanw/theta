@@ -2,9 +2,6 @@ class Vector {
 	var x double
 	var y double
 
-	def new {
-	}
-
 	def new(x double, y double) {
 		self.x = x
 		self.y = y
@@ -114,5 +111,12 @@ class Vector {
 
 	def toString string {
 		return "Vector(\(x), \(y))"
+	}
+}
+
+namespace Vector {
+	@neverinline
+	def new Vector {
+		return new(0, 0)
 	}
 }

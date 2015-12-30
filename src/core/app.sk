@@ -12,6 +12,12 @@ enum App.Animation {
 	EASE_IN_OUT
 }
 
+enum App.MouseAction {
+	NONE
+	CANVAS_MOVE
+	EDITOR_SELECT
+}
+
 class App :: Platform.Delegate, Layout.Editor.Delegate {
 	var _platform Platform
 	var _canvas Canvas
@@ -23,8 +29,11 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	var _idleFrames = 0
 	var _oldTouches List<OldTouch> = []
 	var _clipboard = Layout.Container.new
-	var _oldMouseX = 0
-	var _oldMouseY = 0
+	var _originalMouseX = 0
+	var _originalMouseY = 0
+	var _previousMouseX = 0
+	var _previousMouseY = 0
+	var _mouseAction MouseAction = .NONE
 
 	# Animation support
 	var _animation Animation = .NONE
@@ -38,7 +47,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	def new(platform Platform, fontData DataArray) {
 		_platform = platform
 		_canvas = Canvas.new(platform, fontData)
-		_editor = Layout.Editor.new(_canvas, 20, 20)
+		_editor = Layout.Editor.new(_canvas, EDITOR_PADDING, EDITOR_PADDING)
 		_createInitialContent
 		_resetCursorBlink
 		platform.setDelegate(self)
@@ -187,26 +196,59 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	}
 
 	def handleMouseDown(x int, y int, buttons Platform.Buttons) {
-		_oldMouseX = x
-		_oldMouseY = y
-		_platform.setCursor(.MOVE)
+		if _mouseAction == .NONE {
+			if isOverEditor(x, y) {
+				_mouseAction = .EDITOR_SELECT
+				_originalMouseX = x
+				_originalMouseY = y
+				handleMouseMove(x, y, buttons)
+			}
+
+			else {
+				_mouseAction = .CANVAS_MOVE
+				_platform.setCursor(.MOVE)
+			}
+		}
+
+		_previousMouseX = x
+		_previousMouseY = y
 	}
 
 	def handleMouseMove(x int, y int, buttons Platform.Buttons) {
-		if buttons != 0 {
-			_canvas.translateOrigin(x - _oldMouseX, y - _oldMouseY)
+		if _mouseAction == .CANVAS_MOVE {
+			_canvas.translateOrigin(x - _previousMouseX, y - _previousMouseY)
+			_platform.setCursor(.MOVE)
 			_invalidate
 		}
-		_oldMouseX = x
-		_oldMouseY = y
+
+		else if _mouseAction == .EDITOR_SELECT {
+			_platform.setCursor(.TEXT)
+			_editor.selectRange(_originalMouseX, _originalMouseY, x, y)
+		}
+
+		else {
+			assert(_mouseAction == .NONE)
+			_platform.setCursor(isOverEditor(x, y) ? .TEXT : .DEFAULT)
+		}
+
+		_previousMouseX = x
+		_previousMouseY = y
 	}
 
 	def handleMouseUp(x int, y int, buttons Platform.Buttons) {
 		if buttons == 0 {
-			_platform.setCursor(.DEFAULT)
+			_mouseAction = .NONE
+			_platform.setCursor(isOverEditor(x, y) ? .TEXT : .DEFAULT)
 		}
-		_oldMouseX = x
-		_oldMouseY = y
+
+		_previousMouseX = x
+		_previousMouseY = y
+	}
+
+	def isOverEditor(x int, y int) bool {
+		return
+			x < _editor.box.width + 2 * EDITOR_PADDING &&
+			y < _editor.box.height + 2 * EDITOR_PADDING
 	}
 
 	def handleShortcut(shortcut Platform.Shortcut) {
@@ -314,7 +356,10 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	def handleFocusChange {
 		if _platform.hasFocus {
 			_resetCursorBlink
-		} else if _isCursorVisible {
+			_mouseAction = .NONE
+		}
+
+		else if _isCursorVisible {
 			_isCursorVisible = false
 			_invalidate
 		}
@@ -366,6 +411,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 
 namespace App {
 	const CURSOR_BLINK_DELAY = 0.5
+	const EDITOR_PADDING = 20
 
 	@entry
 	def main {

@@ -50,6 +50,12 @@ namespace Layout {
 		def height double {
 			return upperHeight + lowerHeight
 		}
+
+		def contains(px double, py double) bool {
+			px -= x
+			py -= y
+			return 0 <= px && px < width && y <= py && py < height
+		}
 	}
 
 	################################################################################
@@ -353,6 +359,7 @@ namespace Layout {
 		def anchorCount int
 		def anchorCountBefore(index int) int
 		def anchorAt(index int) Anchor
+		def anchorIndexFromPoint(x double, y double) int
 		def calculateSize(renderer Renderer, previous Element, parentFontSize double)
 		def updateLayout(x double, y double)
 		def render(renderer Renderer)
@@ -401,6 +408,10 @@ namespace Layout {
 		over anchorAt(index int) Anchor {
 			assert(false)
 			return null
+		}
+
+		over anchorIndexFromPoint(x double, y double) int {
+			return x < box.x + box.width / 2 ? -1 : 0
 		}
 
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
@@ -507,6 +518,32 @@ namespace Layout {
 			return Anchor.new(self, index, children.count, null)
 		}
 
+		over anchorIndexFromPoint(x double, y double) int {
+			# Left side
+			if x <= box.x {
+				return 0
+			}
+
+			var baseIndex = 0
+
+			# Scan over the children
+			for i in 0..children.count {
+				var child = children[i]
+				var childX = child.box.x
+				var childWidth = child.box.width
+
+				# Is the point inside this child?
+				if x <= childX + childWidth {
+					return baseIndex + 1 + child.anchorIndexFromPoint(x, y)
+				}
+
+				baseIndex += 1 + child.anchorCount
+			}
+
+			# Right side
+			return baseIndex
+		}
+
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
 			box.width = 0
 			box.upperHeight = 0
@@ -606,6 +643,7 @@ namespace Layout {
 		over anchorAt(index int) Anchor {
 			assert(index >= 0 && index < anchorCount)
 			var relative = index
+
 			for i in 0..children.count {
 				var child = children[i]
 				var count = child.anchorCount
@@ -614,8 +652,49 @@ namespace Layout {
 				}
 				relative -= count
 			}
+
 			assert(false)
 			return null
+		}
+
+		over anchorIndexFromPoint(x double, y double) int {
+			assert(!children.isEmpty)
+			var box = self.box
+			var first = children[0]
+			var firstBox = first.box
+
+			switch kind {
+				case .FRACTION {
+					assert(children.count == 2)
+					var second = children[1]
+					var child = y < second.box.y ? first : second
+					var childBox = child.box
+
+					return
+						x < (box.x + childBox.x) / 2 ? -1 :
+						x > (box.x + box.width + childBox.x + childBox.width) / 2 ? anchorCount :
+						child.anchorIndexFromPoint(x, y) + (child == second ? first.anchorCount : 0)
+				}
+
+				case .OVER, .UNDER {
+					assert(children.count == 1)
+					return
+						x < box.x ? -1 :
+						x > box.x + box.width ? anchorCount :
+						first.anchorIndexFromPoint(x, y)
+				}
+
+				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES {
+					assert(children.count == 1)
+					return
+						x < firstBox.x ? -1 :
+						x > firstBox.x + firstBox.width ? anchorCount :
+						first.anchorIndexFromPoint(x, y)
+				}
+			}
+
+			assert(false)
+			return -1
 		}
 
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
@@ -831,6 +910,10 @@ namespace Layout {
 			return !_selection.isEmpty
 		}
 
+		def box Box {
+			return _root.box
+		}
+
 		def setDelegate(delegate Delegate) {
 			_delegate = delegate
 		}
@@ -863,6 +946,17 @@ namespace Layout {
 		def selectAll {
 			_selection.changeAnchors(_root.anchorAt(0), _root.anchorAt(_root.anchorCount - 1))
 			_notifyDelegateOfChange(.SELECTION)
+		}
+
+		def selectRange(ax double, ay double, bx double, by double) {
+			var start = _root.anchorIndexFromPoint(ax, ay)
+			var end = _root.anchorIndexFromPoint(bx, by)
+
+			if start != _selection.start.relativeIndex ||
+					end != _selection.end.relativeIndex {
+				_selection.changeAnchors(_root.anchorAt(start), _root.anchorAt(end))
+				_notifyDelegateOfChange(.SELECTION)
+			}
 		}
 
 		def cut Container {

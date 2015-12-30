@@ -6,29 +6,10 @@ class Transform {
 	var m11 = 1.0
 	var m12 = 0.0
 
-	def new {
-	}
-
-	def new(t Transform) {
-		m00 = t.m00
-		m01 = t.m01
-		m02 = t.m02
-		m10 = t.m10
-		m11 = t.m11
-		m12 = t.m12
-	}
-
-	def new(m00 double, m01 double, m02 double, m10 double, m11 double, m12 double) {
-		self.m00 = m00
-		self.m01 = m01
-		self.m02 = m02
-		self.m10 = m10
-		self.m11 = m11
-		self.m12 = m12
-	}
-
 	def clone Transform {
-		return new(m00, m01, m02, m10, m11, m12)
+		var clone = new
+		clone.set(self)
+		return clone
 	}
 
 	def equals(t Transform) bool {
@@ -84,18 +65,13 @@ class Transform {
 	}
 
 	def multiply(t Transform) {
-		var v00 = m00 * t.m00 + m01 * t.m10
-		var v01 = m00 * t.m01 + m01 * t.m11
-		var v02 = m00 * t.m02 + m01 * t.m12 + m02
-		var v10 = m10 * t.m00 + m11 * t.m10
-		var v11 = m10 * t.m01 + m11 * t.m11
-		var v12 = m10 * t.m02 + m11 * t.m12 + m12
-		m00 = v00
-		m01 = v01
-		m02 = v02
-		m10 = v10
-		m11 = v11
-		m12 = v12
+		set(
+			m00 * t.m00 + m01 * t.m10,
+			m00 * t.m01 + m01 * t.m11,
+			m00 * t.m02 + m01 * t.m12 + m02,
+			m10 * t.m00 + m11 * t.m10,
+			m10 * t.m01 + m11 * t.m11,
+			m10 * t.m02 + m11 * t.m12 + m12)
 	}
 
 	def invert bool {
@@ -103,18 +79,13 @@ class Transform {
 		if determinant.isNaN {
 			return false
 		}
-		var v00 = m11 * determinant
-		var v01 = -m01 * determinant
-		var v02 = (m01 * m12 - m11 * m02) * determinant
-		var v10 = -m10 * determinant
-		var v11 = m00 * determinant
-		var v12 = (m10 * m02 - m00 * m12) * determinant
-		m00 = v00
-		m01 = v01
-		m02 = v02
-		m10 = v10
-		m11 = v11
-		m12 = v12
+		set(
+			m11 * determinant,
+			-m01 * determinant,
+			(m01 * m12 - m11 * m02) * determinant,
+			-m10 * determinant,
+			m00 * determinant,
+			(m10 * m02 - m00 * m12) * determinant)
 		return true
 	}
 

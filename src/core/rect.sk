@@ -1,18 +1,8 @@
 class Rect {
-	var x double
-	var y double
-	var width double
-	var height double
-
-	def new {
-	}
-
-	def new(x double, y double, width double, height double) {
-		self.x = x
-		self.y = y
-		self.width = width
-		self.height = height
-	}
+	var x = 0.0
+	var y = 0.0
+	var width = 0.0
+	var height = 0.0
 
 	def left double {
 		return x
@@ -49,7 +39,9 @@ class Rect {
 	}
 
 	def clone Rect {
-		return new(x, y, width, height)
+		var clone = new
+		clone.set(self)
+		return clone
 	}
 
 	def toString string {
