@@ -1,0 +1,89 @@
+namespace Equation {
+	class GLSLCompiler {
+		var shadeAreaUnderCurve = false
+		var hideCurve = false
+
+		def compile(node Node) string {
+			shadeAreaUnderCurve = false
+			hideCurve = false
+
+			return
+				"float eq(float x,float y){" +
+					"float r=sqrt(x*x+y*y)," +
+					"theta=mod(atan(y,x),\(2*Math.PI));" +
+					"return \(_compile(node));" +
+				"}"
+		}
+
+		def _compile(node Node) string {
+			switch node.kind {
+				case .NUMBER {
+					var text = node.asDouble.toString
+					return "." in text ? text : text + ".0"
+				}
+
+				case .FUNCTION, .SYMBOL {
+					var text = node.asString
+					return
+						text == "π" ? Math.PI.toString :
+						text == "e" ? Math.E.toString :
+						text == "θ" ? "theta" :
+						text == "ln" ? "log" :
+						text
+				}
+
+				case .EQUAL {
+					return "(" + _compile(node.binaryLeft) + ")-(" + _compile(node.binaryRight) + ")"
+				}
+
+				case .LESS_THAN, .LESS_THAN_EQUAL {
+					shadeAreaUnderCurve = true
+					hideCurve = node.kind == .LESS_THAN
+					return "(" + _compile(node.binaryRight) + ")-(" + _compile(node.binaryLeft) + ")"
+				}
+
+				case .GREATER_THAN, .GREATER_THAN_EQUAL {
+					shadeAreaUnderCurve = true
+					hideCurve = node.kind == .GREATER_THAN
+					return "(" + _compile(node.binaryLeft) + ")-(" + _compile(node.binaryRight) + ")"
+				}
+
+				case .NEGATE {
+					return "-(" + _compile(node.unaryValue) + ")"
+				}
+
+				case .DIVIDE {
+					return "(" + _compile(node.binaryLeft) + ")/(" + _compile(node.binaryRight) + ")"
+				}
+
+				case .EXPONENT {
+					return "pow(" + _compile(node.binaryLeft) + "," + _compile(node.binaryRight) + ")"
+				}
+
+				case .ADD, .MULTIPLY {
+					var text = node.hasChildren ? "" : node.kind == .ADD ? "0." : "1."
+					for child = node.firstChild; child != null; child = child.nextSibling {
+						if child.previousSibling != null {
+							text += node.kind == .ADD ? "+" : "*"
+						}
+						text += "(" + _compile(child) + ")"
+					}
+					return text
+				}
+
+				case .CALL {
+					var text = _compile(node.callValue) + "("
+					for child = node.callValue.nextSibling; child != null; child = child.nextSibling {
+						text += _compile(child)
+						if child.nextSibling != null {
+							text += ","
+						}
+					}
+					return text + ")"
+				}
+			}
+
+			return "0."
+		}
+	}
+}

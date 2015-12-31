@@ -20,9 +20,8 @@ class Canvas :: Layout.Renderer {
 	var _usedInstances = 0
 	var _isInvalid = true
 	var _validFrames = 0
-	var _hideCurve = false
-	var _shadeAreaUnderCurve = false
 	var _cachedEquation Equation.Node = null
+	var _compiler = Equation.GLSLCompiler.new
 
 	# Viewport transform
 	var _origin = Vector.new
@@ -240,77 +239,6 @@ class Canvas :: Layout.Renderer {
 		_smooth.flush
 	}
 
-	def _compile(node Equation.Node) string {
-		switch node.kind {
-			case .NUMBER {
-				var text = node.asDouble.toString
-				return "." in text ? text : text + ".0"
-			}
-
-			case .FUNCTION, .SYMBOL {
-				var text = node.asString
-				return
-					text == "π" ? Math.PI.toString :
-					text == "e" ? Math.E.toString :
-					text == "θ" ? "theta" :
-					text == "ln" ? "log" :
-					text
-			}
-
-			case .EQUAL {
-				return "(" + _compile(node.binaryLeft) + ")-(" + _compile(node.binaryRight) + ")"
-			}
-
-			case .LESS_THAN, .LESS_THAN_EQUAL {
-				_shadeAreaUnderCurve = true
-				_hideCurve = node.kind == .LESS_THAN
-				return "(" + _compile(node.binaryRight) + ")-(" + _compile(node.binaryLeft) + ")"
-			}
-
-			case .GREATER_THAN, .GREATER_THAN_EQUAL {
-				_shadeAreaUnderCurve = true
-				_hideCurve = node.kind == .GREATER_THAN
-				return "(" + _compile(node.binaryLeft) + ")-(" + _compile(node.binaryRight) + ")"
-			}
-
-			case .NEGATE {
-				return "-(" + _compile(node.unaryValue) + ")"
-			}
-
-			case .DIVIDE {
-				return "(" + _compile(node.binaryLeft) + ")/(" + _compile(node.binaryRight) + ")"
-			}
-
-			case .EXPONENT {
-				return "pow(" + _compile(node.binaryLeft) + "," + _compile(node.binaryRight) + ")"
-			}
-
-			case .ADD, .MULTIPLY {
-				var text = node.hasChildren ? "" : node.kind == .ADD ? "0." : "1."
-				for child = node.firstChild; child != null; child = child.nextSibling {
-					if child.previousSibling != null {
-						text += node.kind == .ADD ? "+" : "*"
-					}
-					text += "(" + _compile(child) + ")"
-				}
-				return text
-			}
-
-			case .CALL {
-				var text = _compile(node.callValue) + "("
-				for child = node.callValue.nextSibling; child != null; child = child.nextSibling {
-					text += _compile(child)
-					if child.nextSibling != null {
-						text += ","
-					}
-				}
-				return text + ")"
-			}
-		}
-
-		return "0."
-	}
-
 	def drawEquation(equation Equation.Node) {
 		if equation == null {
 			return
@@ -318,22 +246,16 @@ class Canvas :: Layout.Renderer {
 
 		# Fall back to the cache for identical equations
 		if _cachedEquation == null || !_cachedEquation.equals(equation) {
-			_shadeAreaUnderCurve = false
-			_hideCurve = false
+			var source = _compiler.compile(equation)
 
 			# Store a copy of the equation for comparison next time
 			_cachedEquation = equation.clone
+			_equationMaterial = null
 
 			# The compilation may fail, in which case we don't draw anything
-			_equationMaterial = null
 			try {
-				_equationMaterial = _context.createMaterial(SCREEN_TRIANGLE_FORMAT, GLSLX_SOURCE_EQUATION_VERTEX, GLSLX_SOURCE_EQUATION_FRAGMENT.replaceAll("void",
-					"float eq(float x,float y){" +
-						"float r=sqrt(x*x+y*y)," +
-						"theta=mod(atan(y,x),\(2*Math.PI));" +
-						"return \(_compile(equation));" +
-					"}" +
-					"void"))
+				_equationMaterial = _context.createMaterial(SCREEN_TRIANGLE_FORMAT, GLSLX_SOURCE_EQUATION_VERTEX,
+					GLSLX_SOURCE_EQUATION_FRAGMENT.replaceAll("void", source + "void"))
 			}
 
 			# Report the error for debugging
@@ -350,7 +272,8 @@ class Canvas :: Layout.Renderer {
 			_transformA.scale(_platform.width * 0.5, -_platform.height * 0.5)
 			_transformA.translate(1, -1)
 
-			_equationMaterial.setUniformFloat(GLSLX_NAME_THICKNESS_AND_MODE, _hideCurve ? 0 : (_shadeAreaUnderCurve ? -2 : 2) * _platform.density)
+			_equationMaterial.setUniformFloat(GLSLX_NAME_THICKNESS_AND_MODE,
+				_compiler.hideCurve ? 0 : (_compiler.shadeAreaUnderCurve ? -2 : 2) * _platform.density)
 			_equationMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformA)
 			_equationMaterial.setUniformVec4(GLSLX_NAME_COLOR, 0, 0.5, 1, 1)
 			_context.setPremultipliedBlendState
