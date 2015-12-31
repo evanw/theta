@@ -20,6 +20,7 @@ class Canvas :: Layout.Renderer {
 	var _usedInstances = 0
 	var _isInvalid = true
 	var _validFrames = 0
+	var _hideCurve = false
 	var _shadeAreaUnderCurve = false
 	var _cachedEquation Equation.Node = null
 
@@ -252,17 +253,18 @@ class Canvas :: Layout.Renderer {
 			}
 
 			case .EQUAL {
-				_shadeAreaUnderCurve = false
 				return "(" + _compile(node.binaryLeft) + ")-(" + _compile(node.binaryRight) + ")"
 			}
 
 			case .LESS_THAN, .LESS_THAN_EQUAL {
 				_shadeAreaUnderCurve = true
+				_hideCurve = node.kind == .LESS_THAN
 				return "(" + _compile(node.binaryRight) + ")-(" + _compile(node.binaryLeft) + ")"
 			}
 
 			case .GREATER_THAN, .GREATER_THAN_EQUAL {
 				_shadeAreaUnderCurve = true
+				_hideCurve = node.kind == .GREATER_THAN
 				return "(" + _compile(node.binaryLeft) + ")-(" + _compile(node.binaryRight) + ")"
 			}
 
@@ -311,6 +313,10 @@ class Canvas :: Layout.Renderer {
 
 		# Fall back to the cache for identical equations
 		if _cachedEquation == null || !_cachedEquation.equals(equation) {
+			_shadeAreaUnderCurve = false
+			_hideCurve = false
+
+			# Compile the equation into GLSL code
 			var source = _compile(equation)
 
 			# Store a copy of the equation for comparison next time
@@ -370,7 +376,7 @@ class Canvas :: Layout.Renderer {
 
 						# Linear equation: "b*d + z = 0"
 						"if(abs(a)<1e-6)" +
-							"d=-z/b;" +
+							"d=abs(z/b);" +
 
 						# Quadratic equation: "a*d^2 + b*d + z = 0"
 						"else{" +
@@ -379,15 +385,15 @@ class Canvas :: Layout.Renderer {
 								"d=line;" +
 							"else{" +
 								"d=sqrt(d);" +
-								"d=min(abs(-b-d),abs(-b+d))/abs(2.*a);" +
+								"d=min(abs(b+d),abs(b-d))/abs(2.*a);" +
 							"}" +
 						"}" +
 
 						# Edge value
-						"float e=clamp(line-abs(d),0.,1.);" +
+						"float e=clamp(line-d,0.,1.);" +
 
 						# Combine edge and area for color
-						"gl_FragColor=\(GLSLX_NAME_COLOR)*" + (_shadeAreaUnderCurve ? "mix(e,1.,float(z>0.)*.25)" : "e") + ";" +
+						"gl_FragColor=\(GLSLX_NAME_COLOR)*" + (_shadeAreaUnderCurve ? _hideCurve ? "clamp(.5+d*sign(z),0.,1.)*.25" : "mix(e,1.,float(z>0.)*.25)" : "e") + ";" +
 					"}")
 			}
 
