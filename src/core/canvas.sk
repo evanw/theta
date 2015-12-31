@@ -13,7 +13,7 @@ class Canvas :: Layout.Renderer {
 	var _glyphMaterial GPU.Material
 	var _textMaterial GPU.Material
 	var _font Font
-	var _quad GPU.BufferArea
+	var _screenTriangle GPU.BufferArea
 	var _color GPU.Texture
 	var _target GPU.TextureSet
 	var _instances List<GlyphInstance> = []
@@ -37,9 +37,9 @@ class Canvas :: Layout.Renderer {
 		_pool = GPU.BufferPool.new(_context)
 		_smooth = GPU.Smooth.new(_context, _pool)
 		_glyphMaterial = _context.createMaterial(Glyph.VERTEX_FORMAT, GLSLX_SOURCE_GLYPH_VERTEX, GLSLX_SOURCE_GLYPH_FRAGMENT)
-		_textMaterial = _context.createMaterial(QUAD_FORMAT, GLSLX_SOURCE_TEXT_VERTEX, GLSLX_SOURCE_TEXT_FRAGMENT)
+		_textMaterial = _context.createMaterial(SCREEN_TRIANGLE_FORMAT, GLSLX_SOURCE_TEXT_VERTEX, GLSLX_SOURCE_TEXT_FRAGMENT)
 		_font = Font.new(fontData, _pool)
-		_quad = _pool.allocate(QUAD_FORMAT, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
+		_screenTriangle = _pool.allocate(SCREEN_TRIANGLE_FORMAT, DataArray.new.appendFloats([-1, -1, 3, -1, -1, 3]).bytes)
 		_color = _context.createTexture(.NEAREST_CLAMP, 0, 0)
 		_target = _context.createTextureSet(_color)
 		_origin.x = _platform.width / 2
@@ -319,7 +319,7 @@ class Canvas :: Layout.Renderer {
 			# The compilation may fail, in which case we don't draw anything
 			_equationMaterial = null
 			try {
-				_equationMaterial = _context.createMaterial(QUAD_FORMAT,
+				_equationMaterial = _context.createMaterial(SCREEN_TRIANGLE_FORMAT,
 
 					# Vertex
 					"uniform mat3 \(GLSLX_NAME_MATRIX3);" +
@@ -367,7 +367,7 @@ class Canvas :: Layout.Renderer {
 			_equationMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformA)
 			_equationMaterial.setUniformVec4(GLSLX_NAME_COLOR, 0, 0.5, 1, 1)
 			_context.setPremultipliedBlendState
-			_context.draw(.TRIANGLE_STRIP, _equationMaterial, _quad)
+			_context.draw(.TRIANGLES, _equationMaterial, _screenTriangle)
 		}
 	}
 
@@ -406,7 +406,7 @@ class Canvas :: Layout.Renderer {
 		_context.setTextureSet(null)
 		_context.setBlendState(.ZERO, .SOURCE_COLOR)
 		_textMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
-		_context.draw(.TRIANGLE_STRIP, _textMaterial, _quad)
+		_context.draw(.TRIANGLES, _textMaterial, _screenTriangle)
 	}
 }
 
@@ -416,7 +416,7 @@ namespace Canvas {
 	const SELECTION_COLOR = Color.new(0, 127, 255, 63)
 	const GRID_LIGHT_COLOR = Color.new(0, 0, 0, 31)
 	const GRID_DARK_COLOR = Color.new(0, 0, 0, 127)
-	const QUAD_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
+	const SCREEN_TRIANGLE_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
 
 	# 6x subpixel AA pattern
 	#
