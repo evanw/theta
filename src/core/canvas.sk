@@ -15,7 +15,7 @@ class Canvas :: Layout.Renderer {
 	var _font Font
 	var _screenTriangle GPU.BufferArea
 	var _color GPU.Texture
-	var _target GPU.TextureSet
+	var _target GPU.RenderTarget
 	var _instances List<GlyphInstance> = []
 	var _usedInstances = 0
 	var _isInvalid = true
@@ -42,7 +42,7 @@ class Canvas :: Layout.Renderer {
 		_font = Font.new(fontData, _pool)
 		_screenTriangle = _pool.allocate(SCREEN_TRIANGLE_FORMAT, DataArray.new.appendFloats([-1, -1, 3, -1, -1, 3]).bytes)
 		_color = _context.createTexture(.NEAREST_CLAMP, 0, 0)
-		_target = _context.createTextureSet(_color)
+		_target = _context.createRenderTarget(_color)
 		_origin.x = _platform.width / 2
 		_origin.y = _platform.height / 2
 	}
@@ -95,9 +95,14 @@ class Canvas :: Layout.Renderer {
 		}
 		_usedInstances = 0
 
+		_context.beginFrame
 		_context.setViewport(0, 0, _platform.pixelWidth, _platform.pixelHeight)
 		_context.setCopyBlendState
 		_context.clear(.WHITE)
+	}
+
+	def endFrame {
+		_context.endFrame
 	}
 
 	def glyph(codePoint int, prefer Prefer) Glyph {
@@ -325,7 +330,7 @@ class Canvas :: Layout.Renderer {
 				_equationMaterial = _context.createMaterial(SCREEN_TRIANGLE_FORMAT, GLSLX_SOURCE_EQUATION_VERTEX, GLSLX_SOURCE_EQUATION_FRAGMENT.replaceAll("void",
 					"float eq(float x,float y){" +
 						"float r=sqrt(x*x+y*y)," +
-						"theta=atan(y,x);" +
+						"theta=mod(atan(y,x),\(2*Math.PI));" +
 						"return \(_compile(equation));" +
 					"}" +
 					"void"))
@@ -359,7 +364,7 @@ class Canvas :: Layout.Renderer {
 		_transformA.scale(2.0 / _platform.width, -2.0 / _platform.height)
 
 		# Switch to the offscreen render target
-		_context.setTextureSet(_target)
+		_context.setRenderTarget(_target)
 		_context.clear(.TRANSPARENT)
 		_context.setViewport(0, 0, _platform.pixelWidth, _platform.pixelHeight)
 		_context.setAddBlendState
@@ -385,7 +390,7 @@ class Canvas :: Layout.Renderer {
 		}
 
 		# Composite the offscreen render target back onto the canvas using the non-zero winding rule
-		_context.setTextureSet(null)
+		_context.setRenderTarget(null)
 		_context.setBlendState(.ZERO, .SOURCE_COLOR)
 		_textMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
 		_context.draw(.TRIANGLES, _textMaterial, _screenTriangle)

@@ -29,15 +29,15 @@ namespace GPU {
 		def createMaterial(format VertexFormat, vertexSource string, fragmentSource string) Material
 		def createTexture(format TextureFormat, width int, height int) Texture { return createTexture(format, width, height, null) }
 		def createTexture(format TextureFormat, width int, height int, pixels Uint8Array) Texture
-		def createTextureSet(texture Texture) TextureSet
+		def createRenderTarget(texture Texture) RenderTarget
 		def createVertexBuffer(byteCount int) VertexBuffer
-		def currentTextureSet TextureSet
+		def currentRenderTarget RenderTarget
 		def draw(primitive Primitive, material Material, area BufferArea)
 		def endFrame
 		def height int
 		def removeContextResetHandler(callback fn())
 		def resize(widthInPixels int, heightInPixels int, widthInAppUnits int, heightInAppUnits int)
-		def setTextureSet(textureSet TextureSet)
+		def setRenderTarget(renderTarget RenderTarget)
 		def setViewport(x int, y int, width int, height int)
 		def width int
 
@@ -139,7 +139,7 @@ namespace GPU {
 		def width int
 	}
 
-	interface TextureSet {
+	interface RenderTarget {
 		def context Context
 		def texture Texture
 		def setColor(texture Texture)

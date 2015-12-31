@@ -424,6 +424,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_editor.render(_isCursorVisible ? .SHOW_CURSOR : .HIDE_CURSOR)
 		_canvas.flushText
 		_canvas.flushSmoothGeometry
+		_canvas.endFrame
 	}
 }
 

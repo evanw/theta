@@ -7,14 +7,14 @@ if TARGET == .JAVASCRIPT {
 			var _comparisonMap IntMap<GLenum> = null
 			var _contextResetHandlers List<fn()> = []
 			var _currentClearColor = Color.TRANSPARENT
-			var _currentTextureSet HTMLTextureSet = null
+			var _currentRenderTarget HTMLRenderTarget = null
 			var _defaultViewport = Rect.new
 			var _forceStateUpdate = true
 			var _generation = 1
 			var _gl WebGLRenderingContext = null
 			var _height = 0
 			var _oldBlendOperations = 0
-			var _oldTextureSet HTMLTextureSet = null
+			var _oldRenderTarget HTMLRenderTarget = null
 			var _oldViewport = Rect.new
 			var _operationMap IntMap<GLenum> = null
 			var _width = 0
@@ -96,12 +96,12 @@ if TARGET == .JAVASCRIPT {
 				_contextResetHandlers.removeOne(callback)
 			}
 
-			def currentTextureSet TextureSet {
-				return _currentTextureSet
+			def currentRenderTarget RenderTarget {
+				return _currentRenderTarget
 			}
 
 			def beginFrame {
-				setTextureSet(null)
+				setRenderTarget(null)
 			}
 
 			def endFrame {
@@ -112,7 +112,7 @@ if TARGET == .JAVASCRIPT {
 			}
 
 			def setViewport(x int, y int, width int, height int) {
-				(_currentTextureSet != null ? _currentTextureSet.viewport : _defaultViewport).set(x, y, width, height)
+				(_currentRenderTarget != null ? _currentRenderTarget.viewport : _defaultViewport).set(x, y, width, height)
 			}
 
 			def draw(primitive Primitive, material Material, area BufferArea) {
@@ -123,7 +123,7 @@ if TARGET == .JAVASCRIPT {
 				assert(area.stride == material.format.stride)
 
 				# Update the texture set before preparing the material so uniform samplers can check for that they use different textures
-				_updateTextureSetAndViewport
+				_updateRenderTargetAndViewport
 				HTMLMaterial.from(material).prepare
 
 				# Update the vertex buffer before updating the format so attributes can bind correctly
@@ -151,7 +151,7 @@ if TARGET == .JAVASCRIPT {
 			}
 
 			def clear(color Color) {
-				_updateTextureSetAndViewport
+				_updateRenderTargetAndViewport
 				_updateBlendState
 
 				if color != _currentClearColor {
@@ -162,8 +162,8 @@ if TARGET == .JAVASCRIPT {
 				_gl.clear(_gl.COLOR_BUFFER_BIT)
 			}
 
-			def setTextureSet(textureSet TextureSet) {
-				_currentTextureSet = HTMLTextureSet.from(textureSet)
+			def setRenderTarget(renderTarget RenderTarget) {
+				_currentRenderTarget = HTMLRenderTarget.from(renderTarget)
 			}
 
 			def createMaterial(format VertexFormat, vertexSource string, fragmentSource string) Material {
@@ -190,18 +190,18 @@ if TARGET == .JAVASCRIPT {
 				return HTMLTexture.new(self, format, width, height, pixels)
 			}
 
-			def createTextureSet(texture Texture) TextureSet {
-				return HTMLTextureSet.new(self, HTMLTexture.from(texture))
+			def createRenderTarget(texture Texture) RenderTarget {
+				return HTMLRenderTarget.new(self, HTMLTexture.from(texture))
 			}
 
-			def _updateTextureSetAndViewport {
-				var textureSet = _currentTextureSet
-				var viewport = textureSet != null ? textureSet.viewport : _defaultViewport
+			def _updateRenderTargetAndViewport {
+				var renderTarget = _currentRenderTarget
+				var viewport = renderTarget != null ? renderTarget.viewport : _defaultViewport
 				var gl = _gl
 
-				if _forceStateUpdate || _oldTextureSet != textureSet {
-					gl.bindFramebuffer(gl.FRAMEBUFFER, textureSet?.framebuffer)
-					_oldTextureSet = textureSet
+				if _forceStateUpdate || _oldRenderTarget != renderTarget {
+					gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget?.framebuffer)
+					_oldRenderTarget = renderTarget
 				}
 
 				if _forceStateUpdate || !_oldViewport.equals(viewport) {
@@ -486,7 +486,7 @@ if TARGET == .JAVASCRIPT {
 			over prepare {
 				var context = HTMLContext.from(_material.context)
 				var gl = context.gl
-				assert(_texture == null || context.currentTextureSet == null || _texture != context.currentTextureSet.texture)
+				assert(_texture == null || context.currentRenderTarget == null || _texture != context.currentRenderTarget.texture)
 				if _generation != context.generation || _isDirty {
 					gl.uniform1i(location, _index)
 					_isDirty = false
@@ -828,7 +828,7 @@ if TARGET == .JAVASCRIPT {
 			}
 		}
 
-		class HTMLTextureSet :: TextureSet {
+		class HTMLRenderTarget :: RenderTarget {
 			var _context HTMLContext
 			var _texture HTMLTexture
 			var _framebuffer WebGLFramebuffer = null
@@ -874,10 +874,10 @@ if TARGET == .JAVASCRIPT {
 			}
 		}
 
-		namespace HTMLTextureSet {
-			def from(textureSet TextureSet) HTMLTextureSet {
-				assert(textureSet == null || textureSet is HTMLTextureSet)
-				return textureSet as HTMLTextureSet
+		namespace HTMLRenderTarget {
+			def from(renderTarget RenderTarget) HTMLRenderTarget {
+				assert(renderTarget == null || renderTarget is HTMLRenderTarget)
+				return renderTarget as HTMLRenderTarget
 			}
 		}
 	}
