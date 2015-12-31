@@ -1,6 +1,7 @@
 precision highp float;
 
 uniform sampler2D texture;
+uniform float thicknessAndMode;
 uniform mat3 matrix3;
 uniform vec4 color;
 
@@ -66,4 +67,64 @@ export void textFragment() {
 		alphaL.y + alphaR.x + alphaR.y,
 		alphaL.x + alphaL.y + alphaR.x
 	) / 6.0, 1.0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+import float eq(float x, float y);
+
+export void equationVertex() {
+	_coord2 = (matrix3 * vec3(position2, 1.0)).xy;
+	gl_Position = vec4(position2, 0.0, 1.0);
+}
+
+export void equationFragment() {
+	float x = _coord2.x;
+	float y = _coord2.y;
+	float dx = dFdx(x);
+	float dy = dFdy(y);
+	float z = eq(x,y);
+
+	// Evaluate all 4 adjacent +/- neighbor pixels
+	vec2 z_neg = vec2(eq(x - dx, y), eq(x, y - dy));
+	vec2 z_pos = vec2(eq(x + dx, y), eq(x, y + dy));
+
+	// Compute the x and y slopes
+	vec2 slope = (z_pos-z_neg) * 0.5;
+
+	// Compute the gradient (the shortest point on the curve is assumed to lie in this direction)
+	vec2 gradient = normalize(slope);
+
+	// Use the parabola "a*t^2 + b*t + z = 0" to approximate the function along the gradient
+	float a = dot((z_neg + z_pos) * 0.5 - z, gradient * gradient);
+	float b = dot(slope, gradient);
+
+	// The distance to the curve is the closest solution to the parabolic equation
+	float distanceToCurve = 0.0;
+	float thickness = abs(thicknessAndMode);
+
+	// Linear equation: "b*t + z = 0"
+	if (abs(a) < 1.0e-6) {
+		distanceToCurve = abs(z / b);
+	}
+
+	// Quadratic equation: "a*t^2 + b*t + z = 0"
+	else {
+		float discriminant = b * b - 4.0 * a * z;
+		if (discriminant < 0.0) {
+			distanceToCurve = thickness;
+		} else {
+			discriminant = sqrt(discriminant);
+			distanceToCurve = min(abs(b + discriminant), abs(b - discriminant)) / abs(2.0 * a);
+		}
+	}
+
+	// Antialias the edge using the distance from the curve
+	float edgeAlpha = clamp(abs(thickness) - distanceToCurve, 0.0, 1.0);
+
+	// Combine edge and area for color
+	gl_FragColor = color * (
+		thicknessAndMode == 0.0 ? clamp(0.5 + z / b, 0.0, 1.0) * 0.25 :
+		thicknessAndMode < 0.0 ? mix(edgeAlpha, 1.0, z > 0.0 ? 0.25 : 0.0) :
+		edgeAlpha);
 }
