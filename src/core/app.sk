@@ -382,6 +382,9 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	def _recompile {
 		_log.clear
 		_equation = _parser.parse(_editor.cloneContents)
+		if !_log.errors.isEmpty {
+			_equation = null
+		}
 	}
 
 	def _invalidate {

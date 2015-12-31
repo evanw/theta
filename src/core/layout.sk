@@ -374,19 +374,19 @@ namespace Layout {
 
 	class Character : Element {
 		const codePoint int
-		var isFunction = false
+		var functionID = INVALID_FUNCTION_ID
 		var fontSize = 0.0
 
 		over clone Element {
 			var clone = new(codePoint)
-			clone.isFunction = isFunction
+			clone.functionID = functionID
 			return clone
 		}
 
 		over elementKind ElementKind {
 			var c = codePoint
 			return
-				isFunction ? .FUNCTION :
+				functionID != INVALID_FUNCTION_ID ? .FUNCTION :
 				Glyph.isWordCodePoint(c) ||
 				c >= '0' && c <= '9' || c == '.' ||
 				c == '!'
@@ -412,10 +412,10 @@ namespace Layout {
 		}
 
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
-			var previousIsFunction =
-				previous is Character ? (previous as Character).isFunction :
-				previous == null ? isFunction :
-				false
+			var previousFunctionID =
+				previous is Character ? (previous as Character).functionID :
+				previous == null ? functionID :
+				INVALID_FUNCTION_ID
 
 			paddingLeft = paddingRight = 0
 			fontSize = parentFontSize
@@ -431,7 +431,7 @@ namespace Layout {
 			}
 
 			# Add space before the glyph
-			else if isFunction != previousIsFunction && (previousIsFunction || previous.elementKind.isOperand) {
+			else if functionID != previousFunctionID && (previousFunctionID != INVALID_FUNCTION_ID || previous.elementKind.isOperand) {
 				paddingLeft = renderer.glyph(' ', .PREFER_NORMAL).advanceWidth * parentFontSize
 			}
 
@@ -450,13 +450,14 @@ namespace Layout {
 		}
 
 		def glyph(renderer Renderer) Glyph {
-			return renderer.glyph(codePoint == '-' ? '−' : codePoint == '*' ? '·' : codePoint, isFunction ? .PREFER_NORMAL : .PREFER_ITALIC)
+			return renderer.glyph(codePoint == '-' ? '−' : codePoint == '*' ? '·' : codePoint, functionID != INVALID_FUNCTION_ID ? .PREFER_NORMAL : .PREFER_ITALIC)
 		}
 	}
 
 	namespace Character {
 		const UPPER_FONT_RATIO = 0.6
 		const LOWER_FONT_RATIO = 0.4
+		const INVALID_FUNCTION_ID = 0
 	}
 
 	################################################################################
@@ -723,7 +724,7 @@ namespace Layout {
 
 					# Add space after functions
 					paddingLeft = 0
-					if previous is Character && (previous as Character).isFunction {
+					if previous is Character && (previous as Character).functionID != Character.INVALID_FUNCTION_ID {
 						paddingLeft = renderer.glyph(' ', .PREFER_NORMAL).advanceWidth * parentFontSize / 2
 					}
 
@@ -893,6 +894,7 @@ namespace Layout {
 		var _delegate Delegate = null
 		var _history List<HistoryState> = []
 		var _historyIndex = 0
+		var _generatedFunctionID = Character.INVALID_FUNCTION_ID
 
 		def new(renderer Renderer, originX int, originY int) {
 			_renderer = renderer
@@ -1165,13 +1167,18 @@ namespace Layout {
 			var skipCount = 0
 			var i = 0
 
+			# Reset the counter before each round of substitutions
+			if indexBase == 0 {
+				_generatedFunctionID = Character.INVALID_FUNCTION_ID
+			}
+
 			# Move over all children, mutating the sequence with character substitutions
 			while i < children.count {
 				var child = children[i]
 
 				# Character elements
 				if child is Character && --skipCount < 0 {
-					(child as Character).isFunction = false
+					(child as Character).functionID = Character.INVALID_FUNCTION_ID
 					var text = ""
 					for j in i..children.count {
 						var sibling = children[j]
@@ -1187,9 +1194,10 @@ namespace Layout {
 
 							# Mark characters that are part of a function
 							if codePoint == FUNCTION_SUBSTITUTION {
+								_generatedFunctionID++
 								for k in i..j + 1 {
 									assert(children[k] is Character)
-									(children[k] as Character).isFunction = true
+									(children[k] as Character).functionID = _generatedFunctionID
 								}
 							}
 						}
