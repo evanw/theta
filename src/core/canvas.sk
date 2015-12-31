@@ -325,6 +325,7 @@ class Canvas :: Layout.Renderer {
 					"uniform mat3 \(GLSLX_NAME_MATRIX3);" +
 					"attribute vec2 \(GLSLX_NAME_POSITION2);" +
 					"varying vec2 _\(GLSLX_NAME_POSITION2);" +
+
 					"void main(){" +
 						"_\(GLSLX_NAME_POSITION2)=(\(GLSLX_NAME_MATRIX3)*vec3(\(GLSLX_NAME_POSITION2),1.)).xy;" +
 						"gl_Position=vec4(\(GLSLX_NAME_POSITION2),0.,1.);" +
@@ -336,15 +337,56 @@ class Canvas :: Layout.Renderer {
 					"uniform vec4 \(GLSLX_NAME_COLOR);" +
 					"uniform float line;" +
 					"varying vec2 _\(GLSLX_NAME_POSITION2);" +
+
+					"float f(float x, float y){" +
+						"float r=sqrt(x*x+y*y)," +
+						"theta=atan(y,x);" +
+						"return \(source);" +
+					"}" +
+
 					"void main(){" +
 						"float x=_\(GLSLX_NAME_POSITION2).x," +
 						"y=_\(GLSLX_NAME_POSITION2).y," +
-						"r=sqrt(x*x+y*y)," +
-						"theta=atan(y,x)," +
-						"z=\(source)," +
-						"d=length(vec2(dFdx(z),dFdy(z)))," +
-						"e=clamp(line-abs(z)/d,0.,1.);" +
-						"if(d==0.)discard;"+
+						"dx=dFdx(x)," +
+						"dy=dFdy(y)," +
+						"z=f(x,y);" +
+
+						# Evaluate all 4 adjacent +/- neighbor pixels
+						"vec2 zn=vec2(f(x-dx,y),f(x,y-dy))," +
+						"zp=vec2(f(x+dx,y),f(x,y+dy))," +
+
+						# Compute the x and y slopes
+						"s=(zp-zn)*.5," +
+
+						# Compute the gradient (the shortest point on the curve is assumed to lie in this direction)
+						"g=normalize(s);" +
+
+						# Use the parabola "a*d^2 + b*d + z = 0" to approximate the function along the gradient
+						"float a=dot((zn+zp)*.5-z,g*g)," +
+						"b=dot(s,g)," +
+
+						# The distance to the curve is the closest solution to the parabolic equation
+						"d=0.;" +
+
+						# Linear equation: "b*d + z = 0"
+						"if(abs(a)<1e-6)" +
+							"d=-z/b;" +
+
+						# Quadratic equation: "a*d^2 + b*d + z = 0"
+						"else{" +
+							"d=b*b-4.*a*z;" +
+							"if(d<0.)" +
+								"d=line;" +
+							"else{" +
+								"d=sqrt(d);" +
+								"d=min(abs(-b-d),abs(-b+d))/abs(2.*a);" +
+							"}" +
+						"}" +
+
+						# Edge value
+						"float e=clamp(line-abs(d),0.,1.);" +
+
+						# Combine edge and area for color
 						"gl_FragColor=\(GLSLX_NAME_COLOR)*" + (_shadeAreaUnderCurve ? "mix(e,1.,float(z>0.)*.25)" : "e") + ";" +
 					"}")
 			}
