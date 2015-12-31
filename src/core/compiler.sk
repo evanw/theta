@@ -2,16 +2,115 @@ namespace Equation {
 	class GLSLCompiler {
 		var shadeAreaUnderCurve = false
 		var hideCurve = false
+		var _functions StringMap<int> = null
 
 		def compile(node Node) string {
 			shadeAreaUnderCurve = false
 			hideCurve = false
+			_functions = {}
+
+			var source = _compile(node)
+			var functions = ""
+
+			################################################################################
+			# Trigonometric
+
+			if "csc" in _functions {
+				functions +=
+					"float csc(float x){" +
+						"return 1./sin(x);" +
+					"}"
+			}
+
+			if "sec" in _functions {
+				functions +=
+					"float sec(float x){" +
+						"return 1./cos(x);" +
+					"}"
+			}
+
+			if "cot" in _functions {
+				functions +=
+					"float cot(float x){" +
+						"return 1./tan(x);" +
+					"}"
+			}
+
+			if "acsc" in _functions {
+				functions +=
+					"float acsc(float x){" +
+						"return asin(1./x);" +
+					"}"
+			}
+
+			if "asec" in _functions {
+				functions +=
+					"float asec(float x){" +
+						"return acos(1./x);" +
+					"}"
+			}
+
+			if "acot" in _functions {
+				functions +=
+					"float acot(float x){" +
+						"return atan(1./x);" +
+					"}"
+			}
+
+			################################################################################
+			# Hyperbolic
+
+			if "sinh" in _functions {
+				functions +=
+					"float sinh(float x){" +
+						"float a=exp(x);" +
+						"return(a-1./a)*.5;" +
+					"}"
+			}
+
+			if "cosh" in _functions {
+				functions +=
+					"float cosh(float x){" +
+						"float a=exp(x);" +
+						"return(a+1./a)*.5;" +
+					"}"
+			}
+
+			if "tanh" in _functions {
+				functions +=
+					"float tanh(float x){" +
+						"float a=exp(x),b=1./a;" +
+						"return(a-b)/(a+b);" +
+					"}"
+			}
+
+			if "asinh" in _functions {
+				functions +=
+					"float asinh(float x){" +
+						"return log(abs(x)+sqrt(x*x+1.))*sign(x);" +
+					"}"
+			}
+
+			if "acosh" in _functions {
+				functions +=
+					"float acosh(float x){" +
+						"return log(x+sqrt(x*x-1.));" +
+					"}"
+			}
+
+			if "atanh" in _functions {
+				functions +=
+					"float atanh(float x){" +
+						"return.5*log(1.+2.*x/(1.-x));" +
+					"}"
+			}
 
 			return
+				functions +
 				"float eq(float x,float y){" +
 					"float r=sqrt(x*x+y*y)," +
 					"theta=mod(atan(y,x),\(2*Math.PI));" +
-					"return \(_compile(node));" +
+					"return \(source);" +
 				"}"
 		}
 
@@ -72,7 +171,9 @@ namespace Equation {
 				}
 
 				case .CALL {
-					var text = _compile(node.callValue) + "("
+					var text = _compile(node.callValue)
+					_functions[text] = 0
+					text += "("
 					for child = node.callValue.nextSibling; child != null; child = child.nextSibling {
 						text += _compile(child)
 						if child.nextSibling != null {
