@@ -181,9 +181,11 @@ namespace Layout {
 			assert(_end.element == _root)
 
 			if !isEmpty {
-				_renderRange(renderer, expandedRange)
+				var rect = expandedRange.bounds
+				renderer.addSelectionBox(rect.x, rect.y, rect.width, rect.height)
 			} else if cursor == .SHOW_CURSOR {
-				_renderAnchor(renderer, _start)
+				var rect = bounds
+				renderer.addBox(rect.x - 0.5, rect.y, 1, rect.height)
 			}
 		}
 
@@ -231,6 +233,45 @@ namespace Layout {
 				_start = current
 			}
 		}
+
+		def bounds Rect {
+			var start = self.start.deepestAnchor
+			var end = self.end.deepestAnchor
+
+			assert(start.containerElement == end.containerElement)
+			assert(start.relativeIndex <= end.relativeIndex)
+
+			var container = start.containerElement
+			var children = container.children
+			var box = container.box
+			var startX = box.x
+			var endX = box.x
+
+			# Accumulate the widths of all previous children
+			for i in 0..start.internalIndex {
+				startX += children[i].box.width
+			}
+			for i in 0..end.internalIndex {
+				endX += children[i].box.width
+			}
+
+			# Adjust the bounds by the padding of the characters on the ends
+			if startX != endX {
+				if start.internalIndex < children.count {
+					startX += children[start.internalIndex].paddingLeft
+				}
+				if end.internalIndex > 0 {
+					endX -= children[end.internalIndex - 1].paddingRight
+				}
+			}
+
+			# Render a box around everything
+			var left = Math.min(startX, endX)
+			var right = Math.max(startX, endX)
+			var bounds = Rect.new
+			bounds.set(left, box.y, right - left, box.height)
+			return bounds
+		}
 	}
 
 	namespace Range {
@@ -277,58 +318,6 @@ namespace Layout {
 			}
 
 			return moved
-		}
-
-		def _renderRange(renderer Renderer, range Range) {
-			var start = range.start.deepestAnchor
-			var end = range.end.deepestAnchor
-			assert(start.containerElement == end.containerElement)
-
-			var container = start.containerElement
-			var children = container.children
-			var box = container.box
-			var startX = box.x
-			var endX = box.x
-
-			# Accumulate the widths of all previous children
-			for i in 0..start.internalIndex {
-				startX += children[i].box.width
-			}
-			for i in 0..end.internalIndex {
-				endX += children[i].box.width
-			}
-
-			# Adjust the bounds by the padding of the characters on the ends
-			if start.internalIndex < children.count {
-				startX += children[start.internalIndex].paddingLeft
-			}
-			if end.internalIndex > 0 {
-				endX -= children[end.internalIndex - 1].paddingRight
-			}
-
-			# Render a box around everything
-			var left = Math.min(startX, endX)
-			var right = Math.max(startX, endX)
-			renderer.addSelectionBox(left, box.y, right - left, box.height)
-		}
-
-		def _renderAnchor(renderer Renderer, anchor Anchor) {
-			var deepest = anchor.deepestAnchor
-			var container = deepest.containerElement
-			var box = container.box
-			var x = box.x
-
-			# Accumulate the widths of all previous children
-			for i in 0..deepest.internalIndex {
-				x += container.children[i].box.width
-			}
-
-			# Center cursors in empty containers
-			if container.children.isEmpty {
-				x += box.width / 2
-			}
-
-			renderer.addBox(x - 0.5, box.y, 1, box.height)
 		}
 	}
 
