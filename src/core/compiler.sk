@@ -12,6 +12,13 @@ namespace Equation {
 			var source = _compile(node)
 			var functions = ""
 
+			if "log10" in _functions {
+				functions +=
+					"float log10(float x){" +
+						"return log(x)/log(10.);" +
+					"}"
+			}
+
 			################################################################################
 			# Trigonometric
 
@@ -128,6 +135,7 @@ namespace Equation {
 						text == "e" ? Math.E.toString :
 						text == "θ" ? "theta" :
 						text == "ln" ? "log" :
+						text == "log" ? "log10" :
 						text
 				}
 
