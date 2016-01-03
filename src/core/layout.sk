@@ -745,7 +745,13 @@ namespace Layout {
 				}
 
 				case .SQUARE_ROOT {
-					box.width = first.box.width + 0.7 * fontSize
+					# Add space after functions
+					paddingLeft = 0
+					if previous is Character && (previous as Character).functionID != Character.INVALID_FUNCTION_ID {
+						paddingLeft = renderer.glyph(' ', .PREFER_NORMAL).advanceWidth * parentFontSize / 2
+					}
+
+					box.width = first.box.width + 0.7 * fontSize + paddingLeft
 					box.upperHeight = first.box.upperHeight
 					box.lowerHeight = first.box.lowerHeight
 				}
@@ -784,7 +790,7 @@ namespace Layout {
 
 				case .SQUARE_ROOT {
 					assert(children.count == 1)
-					first.updateLayout(x + 0.55 * fontSize, y + box.height - first.box.height)
+					first.updateLayout(x + 0.55 * fontSize + paddingLeft, y + box.height - first.box.height)
 				}
 
 				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES {
@@ -829,19 +835,20 @@ namespace Layout {
 					var glyph = Glyph.new
 					var width = box.width
 					var height = box.height
+					var x = paddingLeft
 					var y = height * 0.5
 
 					compiler.begin(glyph)
-					compiler.moveTo(fontSize * 0.47, 0)
+					compiler.moveTo(x + fontSize * 0.47, 0)
 					compiler.lineTo(width - fontSize * 0.1, 0)
 					compiler.lineTo(width - fontSize * 0.1, fontSize * 0.05)
-					compiler.lineTo(fontSize * 0.52, fontSize * 0.05)
-					compiler.lineTo(fontSize * 0.36, height - fontSize * 0.03)
-					compiler.lineTo(fontSize * 0.12, y)
-					compiler.lineTo(fontSize * 0.02, y + fontSize * 0.05)
-					compiler.lineTo(0, y)
-					compiler.lineTo(fontSize * 0.16, y - fontSize * 0.08)
-					compiler.lineTo(fontSize * 0.33, height * 0.75)
+					compiler.lineTo(x + fontSize * 0.52, fontSize * 0.05)
+					compiler.lineTo(x + fontSize * 0.36, height - fontSize * 0.03)
+					compiler.lineTo(x + fontSize * 0.12, y)
+					compiler.lineTo(x + fontSize * 0.02, y + fontSize * 0.05)
+					compiler.lineTo(x + 0, y)
+					compiler.lineTo(x + fontSize * 0.16, y - fontSize * 0.08)
+					compiler.lineTo(x + fontSize * 0.33, height * 0.75)
 					compiler.end
 					renderer.addGlyph(glyph, box.x, box.y, 1)
 				}
