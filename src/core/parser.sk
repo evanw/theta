@@ -184,14 +184,14 @@ namespace Equation {
 
 			# Code point tokens
 			if token.kind == .CODE_POINT {
-				context.next
-
 				switch token.codePoint {
 					case '+' {
+						context.next
 						return _parse(context, .PREFIX)
 					}
 
 					case '-' {
+						context.next
 						var value = _parse(context, .PREFIX)
 						if value == null {
 							return null
@@ -369,7 +369,7 @@ namespace Equation {
 						case .FRACTION {
 							assert(containers.count == 2)
 							kind = .OPERAND
-							node = Node.createBinary(.DIVIDE, first, _tokenizeAndParse(containers[1], baseIndex + 1, .TUPLE)).withRange(range)
+							node = Node.createBinary(.DIVIDE, first, _tokenizeAndParse(containers[1], baseIndex + 1 + containers[0].anchorCount, .TUPLE)).withRange(range)
 						}
 
 						case .OVER {
@@ -493,7 +493,6 @@ namespace Equation {
 			}
 
 			# Every token stream must end in an "end of input" token
-			baseIndex++
 			tokens.append(Token.new(.END_OF_INPUT, Range.new(baseIndex, baseIndex), 0, null))
 
 			return ParserContext.new(_log, tokens)

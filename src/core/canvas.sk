@@ -139,6 +139,28 @@ class Canvas :: Layout.Renderer {
 		_smooth.fillRect(x, y, width, height, SELECTION_COLOR)
 	}
 
+	def addErrorLine(x1 double, x2 double, y double) {
+		# Triangle
+		if x1 == x2 {
+			_smooth.fillConvexPolygon([
+				Vector.new(x1, y),
+				Vector.new(x1 + 3, y + 4),
+				Vector.new(x1 - 3, y + 4),
+			], .RED)
+		}
+
+		# Squiggle
+		else {
+			var line List<Vector> = []
+			var zigzag = 0
+			for x = x1; x < x2; x += 2 {
+				line.append(Vector.new(x, y + zigzag))
+				zigzag = zigzag == 0 ? 2 : 0
+			}
+			_smooth.strokeNonOverlappingPolyline(line, .RED, 1, .OPEN)
+		}
+	}
+
 	def glyphCompiler GlyphCompiler {
 		return _font.glyphCompiler
 	}

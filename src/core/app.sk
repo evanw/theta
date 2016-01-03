@@ -422,6 +422,12 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_canvas.flushSmoothGeometry
 		_canvas.drawEquation(_equation)
 		_editor.render(_isCursorVisible ? .SHOW_CURSOR : .HIDE_CURSOR)
+
+		if !_log.errors.isEmpty {
+			var range = _log.errors.first.range
+			_editor.renderErrorForRange(range.start, range.end)
+		}
+
 		_canvas.flushText
 		_canvas.flushSmoothGeometry
 		_canvas.endFrame

@@ -67,6 +67,7 @@ namespace Layout {
 		def addGlyph(glyph Glyph, x double, y double, scale double)
 		def addBox(x double, y double, width double, height double)
 		def addSelectionBox(x double, y double, width double, height double)
+		def addErrorLine(x1 double, x2 double, y double)
 	}
 
 	################################################################################
@@ -944,6 +945,11 @@ namespace Layout {
 		def render(cursor Cursor) {
 			_root.render(_renderer)
 			_selection.render(_renderer, cursor)
+		}
+
+		def renderErrorForRange(start int, end int) {
+			var bounds = Range.new(_root, _root.anchorAt(start), _root.anchorAt(end)).bounds
+			_renderer.addErrorLine(bounds.x, bounds.x + bounds.width, bounds.y + bounds.height)
 		}
 
 		def undo {
