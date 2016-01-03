@@ -99,11 +99,8 @@ class Glyph {
 	var advanceWidth = 0.0
 	var byteOffset = 0
 	var byteLength = 0
-	var minX = 0.0
-	var minY = 0.0
-	var maxX = 0.0
-	var maxY = 0.0
 	var area GPU.BufferArea = null
+	var bounds Rect = null
 
 	def free {
 		area.free
@@ -133,12 +130,12 @@ class GlyphCompiler {
 	var _currentY = 0.0
 	var _contourCount = 0
 	var _glyph Glyph = null
+	var _builder = RectBuilder.new
 
 	def begin(glyph Glyph) {
 		assert(glyph.area == null)
-		glyph.minX = glyph.minY = Math.INFINITY
-		glyph.maxX = glyph.maxY = -Math.INFINITY
 		_glyph = glyph
+		_builder.reset
 		_vertices.clear
 	}
 
@@ -175,6 +172,7 @@ class GlyphCompiler {
 
 	def end {
 		_glyph.area = _pool.allocate(Glyph.VERTEX_FORMAT, _vertices.bytes)
+		_glyph.bounds = _builder.build
 	}
 
 	def _appendTriangle(ax double, ay double, bx double, by double, cx double, cy double, kind TriangleKind) {
@@ -194,11 +192,7 @@ class GlyphCompiler {
 	}
 
 	def _appendVertex(x double, y double, s double, t double) {
-		var glyph = _glyph
-		glyph.minX = Math.min(glyph.minX, x)
-		glyph.minY = Math.min(glyph.minY, y)
-		glyph.maxX = Math.max(glyph.maxX, x)
-		glyph.maxY = Math.max(glyph.maxY, y)
+		_builder.include(x, y)
 		_vertices.appendFloat(x).appendFloat(y).appendFloat(s).appendFloat(t)
 	}
 }

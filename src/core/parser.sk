@@ -107,7 +107,7 @@ namespace Equation {
 
 		def syntaxErrorUnexpectedToken(token Token) {
 			error(token.range, "Unexpected " + (
-				token.kind == .CODE_POINT ? "\"" + string.fromCodePoint(token.codePoint) + "\"" :
+				token.kind == .CODE_POINT ? "“" + string.fromCodePoint(Layout.Character.substituteCodePoint(token.codePoint)) + "”" :
 				token.kind == .END_OF_INPUT ? "end of input" :
 				token.kind == .OVER ? "exponent" :
 				token.kind == .UNDER ? "subscript" :

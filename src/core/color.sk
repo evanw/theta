@@ -9,6 +9,10 @@ type Color : int {
 	def blueF double { return blue / 255.0 }
 	def alphaF double { return alpha / 255.0 }
 
+	def opaque Color {
+		return new(red, green, blue, 255)
+	}
+
 	def premultiplied Color {
 		var a = alphaF
 		return new(redF * a, greenF * a, blueF * a, a)

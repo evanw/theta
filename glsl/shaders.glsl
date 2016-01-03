@@ -4,6 +4,7 @@ uniform sampler2D texture;
 uniform float thicknessAndMode;
 uniform mat3 matrix3;
 uniform vec4 color;
+uniform vec4 rect;
 
 attribute vec2 position2;
 attribute vec4 position4;
@@ -44,8 +45,8 @@ export void glyphFragment() {
 ////////////////////////////////////////////////////////////////////////////////
 
 export void textVertex() {
-	_coord2 = position2 * 0.5 + 0.5;
-	gl_Position = vec4(position2, 0.0, 1.0);
+	_coord2 = mix(rect.xy, rect.zw, position2 * 0.5 + 0.5);
+	gl_Position = vec4(_coord2 * 2.0 - 1.0, 0.0, 1.0);
 }
 
 export void textFragment() {
@@ -62,11 +63,11 @@ export void textFragment() {
 	vec3 alphaR = min(abs(upperR - lowerR), 2.0);
 
 	// Average the energy over the pixels on either side
-	gl_FragColor = vec4(1.0 - vec3(
-		alphaR.x + alphaR.y + alphaR.z,
-		alphaL.y + alphaR.x + alphaR.y,
-		alphaL.x + alphaL.y + alphaR.x
-	) / 6.0, 1.0);
+	gl_FragColor = color * vec4(
+		(alphaR.x + alphaR.y + alphaR.z) / 6.0,
+		(alphaL.y + alphaR.x + alphaR.y) / 6.0,
+		(alphaL.x + alphaL.y + alphaR.x) / 6.0,
+		1.0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -13,10 +13,11 @@ class Canvas :: Layout.Renderer {
 	var _glyphMaterial GPU.Material
 	var _textMaterial GPU.Material
 	var _font Font
-	var _screenTriangle GPU.BufferArea
+	var _screenQuad GPU.BufferArea
 	var _color GPU.Texture
 	var _target GPU.RenderTarget
 	var _instances List<GlyphInstance> = []
+	var _instanceBounds = RectBuilder.new
 	var _usedInstances = 0
 	var _isInvalid = true
 	var _validFrames = 0
@@ -37,9 +38,9 @@ class Canvas :: Layout.Renderer {
 		_pool = GPU.BufferPool.new(_context)
 		_smooth = GPU.Smooth.new(_context, _pool)
 		_glyphMaterial = _context.createMaterial(Glyph.VERTEX_FORMAT, GLSLX_SOURCE_GLYPH_VERTEX, GLSLX_SOURCE_GLYPH_FRAGMENT)
-		_textMaterial = _context.createMaterial(SCREEN_TRIANGLE_FORMAT, GLSLX_SOURCE_TEXT_VERTEX, GLSLX_SOURCE_TEXT_FRAGMENT)
+		_textMaterial = _context.createMaterial(SCREEN_QUAD_FORMAT, GLSLX_SOURCE_TEXT_VERTEX, GLSLX_SOURCE_TEXT_FRAGMENT)
 		_font = Font.new(fontData, _pool)
-		_screenTriangle = _pool.allocate(SCREEN_TRIANGLE_FORMAT, DataArray.new.appendFloats([-1, -1, 3, -1, -1, 3]).bytes)
+		_screenQuad = _pool.allocate(SCREEN_QUAD_FORMAT, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
 		_color = _context.createTexture(.NEAREST_CLAMP, 0, 0)
 		_target = _context.createRenderTarget(_color)
 		_origin.x = _platform.width / 2
@@ -85,15 +86,6 @@ class Canvas :: Layout.Renderer {
 		_transformA.scale(2.0 / _platform.width, -2.0 / _platform.height)
 		_smooth.setTransformAndPixelScale(_transformA, 1 / _platform.density)
 
-		# Garbage collect temporary glyphs
-		for i in 0.._usedInstances {
-			var glyph = _instances[i].glyph
-			if glyph.codePoint == Glyph.TEMPORARY_CODE_POINT {
-				glyph.free
-			}
-		}
-		_usedInstances = 0
-
 		_context.beginFrame
 		_context.setViewport(0, 0, _platform.pixelWidth, _platform.pixelHeight)
 		_context.setCopyBlendState
@@ -109,16 +101,33 @@ class Canvas :: Layout.Renderer {
 	}
 
 	def addGlyph(glyph Glyph, x double, y double, scale double) {
+		if glyph.area == null {
+			return # Ignore spaces
+		}
+
+		# Grow the glyph instance array if it's not big enough
 		if _usedInstances == _instances.count {
 			_instances.append(GlyphInstance.new)
 		}
 
+		# Place an instance of this glyph
 		var instance = _instances[_usedInstances]
 		instance.glyph = glyph
 		instance.offset.set(x, y)
 		instance.scale = scale
 		_usedInstances++
 		assert(_usedInstances <= _instances.count)
+
+		# Expand the rendered bounds to include the instance
+		var bounds = glyph.bounds
+		var left = x + bounds.x * scale
+		var top = y + bounds.y * scale
+		var right = left + bounds.width * scale
+		var bottom = top + bounds.height * scale
+		_instanceBounds.include(left, top)
+		_instanceBounds.include(right, top)
+		_instanceBounds.include(left, bottom)
+		_instanceBounds.include(right, bottom)
 	}
 
 	def addBox(x double, y double, width double, height double) {
@@ -177,7 +186,7 @@ class Canvas :: Layout.Renderer {
 		return width
 	}
 
-	def _addText(text string, x double, y double, scale double, prefer Prefer) {
+	def addText(text string, x double, y double, scale double, prefer Prefer) {
 		for i in 0..text.count {
 			var glyph = _font.glyph(text[i], prefer)
 			addGlyph(glyph, x, y, scale)
@@ -240,7 +249,7 @@ class Canvas :: Layout.Renderer {
 			if x != 0 {
 				_smooth.strokeLine(tx, origin.y - GRID_TICK_SIZE, tx, origin.y + GRID_TICK_SIZE, .BLACK, 2)
 			}
-			_addText(_formatNumber(x / textStep), tx + GRID_FONT_SIZE * 0.3, textY + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE, .PREFER_NORMAL)
+			addText(_formatNumber(x / textStep), tx + GRID_FONT_SIZE * 0.3, textY + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE, .PREFER_NORMAL)
 		}
 
 		# Vertical axis
@@ -250,7 +259,7 @@ class Canvas :: Layout.Renderer {
 				var text = _formatNumber(y / textStep)
 				var ty = origin.y - y * scale / textStep
 				_smooth.strokeLine(origin.x - GRID_TICK_SIZE, ty, origin.x + GRID_TICK_SIZE, ty, .BLACK, 2)
-				_addText(text, Math.min(textX, width - _computeTextWidth(text, GRID_FONT_SIZE, .PREFER_NORMAL) - GRID_FONT_SIZE * 0.3),
+				addText(text, Math.min(textX, width - _computeTextWidth(text, GRID_FONT_SIZE, .PREFER_NORMAL) - GRID_FONT_SIZE * 0.3),
 					ty + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE, .PREFER_NORMAL)
 			}
 		}
@@ -276,7 +285,7 @@ class Canvas :: Layout.Renderer {
 
 			# The compilation may fail, in which case we don't draw anything
 			try {
-				_equationMaterial = _context.createMaterial(SCREEN_TRIANGLE_FORMAT, GLSLX_SOURCE_EQUATION_VERTEX,
+				_equationMaterial = _context.createMaterial(SCREEN_QUAD_FORMAT, GLSLX_SOURCE_EQUATION_VERTEX,
 					GLSLX_SOURCE_EQUATION_FRAGMENT.replaceAll("void", source + "void"))
 			}
 
@@ -299,19 +308,23 @@ class Canvas :: Layout.Renderer {
 			_equationMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformA)
 			_equationMaterial.setUniformVec4(GLSLX_NAME_COLOR, 0, 0.5, 1, 1)
 			_context.setPremultipliedBlendState
-			_context.draw(.TRIANGLES, _equationMaterial, _screenTriangle)
+			_context.draw(.TRIANGLE_STRIP, _equationMaterial, _screenQuad)
 		}
 	}
 
-	def flushText {
+	def flushText(color Color) {
+		if _usedInstances == 0 {
+			return
+		}
+
 		_transformA.reset
 		_transformA.translate(-1, 1)
 		_transformA.scale(2.0 / _platform.width, -2.0 / _platform.height)
 
 		# Switch to the offscreen render target
 		_context.setRenderTarget(_target)
-		_context.clear(.TRANSPARENT)
 		_context.setViewport(0, 0, _platform.pixelWidth, _platform.pixelHeight)
+		_context.clear(.TRANSPARENT)
 		_context.setAddBlendState
 
 		# Take multiple samples of glyph outlines using the GPU
@@ -336,9 +349,34 @@ class Canvas :: Layout.Renderer {
 
 		# Composite the offscreen render target back onto the canvas using the non-zero winding rule
 		_context.setRenderTarget(null)
-		_context.setBlendState(.ZERO, .SOURCE_COLOR)
+		_context.setBlendState(.ZERO, .INVERSE_SOURCE_COLOR)
 		_textMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
-		_context.draw(.TRIANGLES, _textMaterial, _screenTriangle)
+		_textMaterial.setUniformVec4(GLSLX_NAME_COLOR, 1, 1, 1, 1)
+		_textMaterial.setUniformVec4(GLSLX_NAME_RECT,
+			Math.floor(_instanceBounds.minX) / _platform.width,
+			1 - Math.ceil(_instanceBounds.maxY) / _platform.height,
+			Math.ceil(_instanceBounds.maxX) / _platform.width,
+			1 - Math.floor(_instanceBounds.minY) / _platform.height)
+		_context.draw(.TRIANGLE_STRIP, _textMaterial, _screenQuad)
+
+		# Colors other than black must be rendered in two passes
+		if color.opaque != .BLACK {
+			_context.setAddBlendState
+			_textMaterial.setUniformVec4(GLSLX_NAME_COLOR, color.redF, color.greenF, color.blueF, color.alphaF)
+			_context.draw(.TRIANGLE_STRIP, _textMaterial, _screenQuad)
+		}
+
+		# Garbage collect temporary glyphs
+		for i in 0.._usedInstances {
+			var glyph = _instances[i].glyph
+			if glyph.codePoint == Glyph.TEMPORARY_CODE_POINT {
+				glyph.free
+			}
+		}
+
+		# Reset the glyph instance buffer
+		_usedInstances = 0
+		_instanceBounds.reset
 	}
 }
 
@@ -348,7 +386,7 @@ namespace Canvas {
 	const SELECTION_COLOR = Color.new(0, 127, 255, 63)
 	const GRID_LIGHT_COLOR = Color.new(0, 0, 0, 31)
 	const GRID_DARK_COLOR = Color.new(0, 0, 0, 127)
-	const SCREEN_TRIANGLE_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
+	const SCREEN_QUAD_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
 
 	# 6x subpixel AA pattern
 	#

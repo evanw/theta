@@ -95,14 +95,16 @@ class Vector {
 		return x * v.x + y * v.y
 	}
 
-	def set(x double, y double) {
+	def set(x double, y double) Vector {
 		self.x = x
 		self.y = y
+		return self
 	}
 
-	def set(v Vector) {
+	def set(v Vector) Vector {
 		x = v.x
 		y = v.y
+		return self
 	}
 
 	def clone Vector {

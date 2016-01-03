@@ -269,8 +269,7 @@ namespace Layout {
 			# Fir a box around everything
 			var left = Math.min(startX, endX)
 			var right = Math.max(startX, endX)
-			var bounds = Rect.new
-			bounds.set(left, box.y, right - left, box.height)
+			var bounds = Rect.new.set(left, box.y, right - left, box.height)
 
 			# Empty containers have non-zero width
 			if children.isEmpty {
@@ -446,7 +445,7 @@ namespace Layout {
 		}
 
 		def glyph(renderer Renderer) Glyph {
-			return renderer.glyph(codePoint == '-' ? '−' : codePoint == '*' ? '·' : codePoint, functionID != INVALID_FUNCTION_ID ? .PREFER_NORMAL : .PREFER_ITALIC)
+			return renderer.glyph(substituteCodePoint(codePoint), functionID != INVALID_FUNCTION_ID ? .PREFER_NORMAL : .PREFER_ITALIC)
 		}
 	}
 
@@ -454,6 +453,10 @@ namespace Layout {
 		const UPPER_FONT_RATIO = 0.6
 		const LOWER_FONT_RATIO = 0.4
 		const INVALID_FUNCTION_ID = 0
+
+		def substituteCodePoint(c int) int {
+			return c == '-' ? '−' : c == '*' ? '·' : c
+		}
 	}
 
 	################################################################################

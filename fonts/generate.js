@@ -148,9 +148,10 @@ function main() {
 				isItalic: false,
 				chars:
 					'abcdefghijklmnopqrstuvwxyz' +
+					'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
 					'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ' +
 					'0123456789' +
-					'+−·÷=<>≤≥,.! \0',
+					'+−·÷=<>≤≥,.! “”\0',
 			},
 			{
 				path: __dirname + '/FreeSerifItalic.ttf',

@@ -24,27 +24,58 @@ class Rect {
 		return x == r.x && y == r.y && width == r.width && height == r.height
 	}
 
-	def set(r Rect) {
+	def isEmpty bool {
+		return width <= 0 || height <= 0
+	}
+
+	def set(r Rect) Rect {
 		x = r.x
 		y = r.y
 		width = r.width
 		height = r.height
+		return self
 	}
 
-	def set(x double, y double, width double, height double) {
+	def set(x double, y double, width double, height double) Rect {
 		self.x = x
 		self.y = y
 		self.width = width
 		self.height = height
+		return self
 	}
 
 	def clone Rect {
-		var clone = new
-		clone.set(self)
-		return clone
+		return new.set(self)
 	}
 
 	def toString string {
 		return "Rect(\(x), \(y), \(width), \(height))"
+	}
+}
+
+class RectBuilder {
+	var minX = 0.0
+	var minY = 0.0
+	var maxX = 0.0
+	var maxY = 0.0
+
+	def new {
+		reset
+	}
+
+	def reset {
+		minX = minY = Math.INFINITY
+		maxX = maxY = -Math.INFINITY
+	}
+
+	def build Rect {
+		return Rect.new.set(minX, minY, maxX - minX, maxY - minY)
+	}
+
+	def include(x double, y double) {
+		minX = Math.min(minX, x)
+		minY = Math.min(minY, y)
+		maxX = Math.max(maxX, x)
+		maxY = Math.max(maxY, y)
 	}
 }

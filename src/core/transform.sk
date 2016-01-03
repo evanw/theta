@@ -7,9 +7,7 @@ class Transform {
 	var m12 = 0.0
 
 	def clone Transform {
-		var clone = new
-		clone.set(self)
-		return clone
+		return new.set(self)
 	}
 
 	def equals(t Transform) bool {
@@ -103,22 +101,24 @@ class Transform {
 		direction.y = y
 	}
 
-	def set(m00 double, m01 double, m02 double, m10 double, m11 double, m12 double) {
+	def set(m00 double, m01 double, m02 double, m10 double, m11 double, m12 double) Transform {
 		self.m00 = m00
 		self.m01 = m01
 		self.m02 = m02
 		self.m10 = m10
 		self.m11 = m11
 		self.m12 = m12
+		return self
 	}
 
-	def set(t Transform) {
+	def set(t Transform) Transform {
 		m00 = t.m00
 		m01 = t.m01
 		m02 = t.m02
 		m10 = t.m10
 		m11 = t.m11
 		m12 = t.m12
+		return self
 	}
 
 	def toString string {
