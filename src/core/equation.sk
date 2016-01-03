@@ -14,7 +14,6 @@ namespace Equation {
 		# Binary
 		DIVIDE
 		EQUAL
-		EXPONENT
 		GREATER_THAN
 		GREATER_THAN_EQUAL
 		LESS_THAN

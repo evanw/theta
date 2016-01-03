@@ -590,6 +590,7 @@ namespace Layout {
 		FRACTION
 		OVER
 		PARENTHESES
+		SQUARE_ROOT
 		UNDER
 	}
 
@@ -671,7 +672,7 @@ namespace Layout {
 						first.anchorIndexFromPoint(x, y)
 				}
 
-				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES {
+				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES, .SQUARE_ROOT {
 					assert(children.count == 1)
 					return
 						x < (box.x + firstBox.x) / 2 ? -1 :
@@ -736,6 +737,12 @@ namespace Layout {
 					box.lowerHeight = (previous != null ? Math.max(0, previous.box.lowerHeight - parentFontSize * Character.LOWER_FONT_RATIO) : 0) + first.box.height
 				}
 
+				case .SQUARE_ROOT {
+					box.width = first.box.width + 0.7 * fontSize
+					box.upperHeight = first.box.upperHeight
+					box.lowerHeight = first.box.lowerHeight
+				}
+
 				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES {
 					box.width = first.box.width + fontSize * (kind == .ABSOLUTE_VALUE || kind == .PARENTHESES ? 2 / 3.0 : 0.8)
 					box.upperHeight = first.box.upperHeight
@@ -768,7 +775,13 @@ namespace Layout {
 					first.updateLayout(x, y + box.height - first.box.height)
 				}
 
+				case .SQUARE_ROOT {
+					assert(children.count == 1)
+					first.updateLayout(x + 0.55 * fontSize, y + box.height - first.box.height)
+				}
+
 				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES {
+					assert(children.count == 1)
 					first.updateLayout(x + (box.width - first.box.width) / 2, y)
 				}
 			}
@@ -802,6 +815,28 @@ namespace Layout {
 						renderer.addBox(box.x + width * 0.6, box.y + y, width * 0.4, width * 0.2)
 						renderer.addBox(box.x + box.width - width, box.y + y, width * 0.4, width * 0.2)
 					}
+				}
+
+				case .SQUARE_ROOT {
+					var compiler = renderer.glyphCompiler
+					var glyph = Glyph.new
+					var width = box.width
+					var height = box.height
+					var y = height * 0.5
+
+					compiler.begin(glyph)
+					compiler.moveTo(fontSize * 0.47, 0)
+					compiler.lineTo(width - fontSize * 0.1, 0)
+					compiler.lineTo(width - fontSize * 0.1, fontSize * 0.05)
+					compiler.lineTo(fontSize * 0.52, fontSize * 0.05)
+					compiler.lineTo(fontSize * 0.36, height - fontSize * 0.03)
+					compiler.lineTo(fontSize * 0.12, y)
+					compiler.lineTo(fontSize * 0.02, y + fontSize * 0.05)
+					compiler.lineTo(0, y)
+					compiler.lineTo(fontSize * 0.16, y - fontSize * 0.08)
+					compiler.lineTo(fontSize * 0.33, height * 0.75)
+					compiler.end
+					renderer.addGlyph(glyph, box.x, box.y, 1)
 				}
 
 				case .PARENTHESES {
@@ -1200,8 +1235,9 @@ namespace Layout {
 							if codePoint < 0 {
 								child = Special.new(
 									codePoint == ABSOLUTE_VALUE_SUBSTITUTION ? .ABSOLUTE_VALUE :
-									codePoint == FLOOR_SUBSTITUTION ? .FLOOR :
 									codePoint == CEIL_SUBSTITUTION ? .CEIL :
+									codePoint == FLOOR_SUBSTITUTION ? .FLOOR :
+									codePoint == SQUARE_ROOT_SUBSTITUTION ? .SQUARE_ROOT :
 									.PARENTHESES)
 								(child as Special).children.append(Container.new)
 							}
@@ -1249,6 +1285,7 @@ namespace Layout {
 		const ABSOLUTE_VALUE_SUBSTITUTION = -2
 		const CEIL_SUBSTITUTION = -3
 		const FLOOR_SUBSTITUTION = -4
+		const SQUARE_ROOT_SUBSTITUTION = -5
 		const SUBSTITUTIONS = {
 			"Alpha": 'Α',
 			"alpha": 'α',
@@ -1309,6 +1346,7 @@ namespace Layout {
 			"abs": ABSOLUTE_VALUE_SUBSTITUTION,
 			"ceil": CEIL_SUBSTITUTION,
 			"floor": FLOOR_SUBSTITUTION,
+			"sqrt": SQUARE_ROOT_SUBSTITUTION,
 		}
 	}
 }

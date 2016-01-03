@@ -157,10 +157,6 @@ namespace Equation {
 					return "(" + _compile(node.binaryLeft) + ")/(" + _compile(node.binaryRight) + ")"
 				}
 
-				case .EXPONENT {
-					return "pow(" + _compile(node.binaryLeft) + "," + _compile(node.binaryRight) + ")"
-				}
-
 				case .ADD, .MULTIPLY {
 					var text = node.hasChildren ? "" : node.kind == .ADD ? "0." : "1."
 					for child = node.firstChild; child != null; child = child.nextSibling {

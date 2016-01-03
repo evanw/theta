@@ -173,7 +173,7 @@ namespace Equation {
 
 					# Handle an exponent on the function itself
 					if power != null && !isInverse {
-						call = Node.createBinary(.EXPONENT, call, power.node).withRange(call.range)
+						call = Node.createCall(Node.createFunction("pow")).appendChild(call).appendChild(power.node).withRange(call.range)
 					}
 
 					return call
@@ -282,7 +282,7 @@ namespace Equation {
 			# Over tokens
 			if token.kind == .OVER {
 				context.next
-				return Node.createBinary(.EXPONENT, left, token.node).withRangeFromChildren
+				return Node.createCall(Node.createFunction("pow").withRange(token.range)).appendChild(left).appendChild(token.node).withRangeFromChildren
 			}
 
 			context.unexpectedToken
@@ -394,19 +394,25 @@ namespace Equation {
 						case .ABSOLUTE_VALUE {
 							assert(containers.count == 1)
 							kind = .OPERAND
-							node = Node.createCall(Node.createSymbol("abs").withRange(range)).appendChild(first).withRange(range)
+							node = Node.createCall(Node.createFunction("abs").withRange(range)).appendChild(first).withRange(range)
 						}
 
 						case .CEIL {
 							assert(containers.count == 1)
 							kind = .OPERAND
-							node = Node.createCall(Node.createSymbol("ceil").withRange(range)).appendChild(first).withRange(range)
+							node = Node.createCall(Node.createFunction("ceil").withRange(range)).appendChild(first).withRange(range)
 						}
 
 						case .FLOOR {
 							assert(containers.count == 1)
 							kind = .OPERAND
-							node = Node.createCall(Node.createSymbol("floor").withRange(range)).appendChild(first).withRange(range)
+							node = Node.createCall(Node.createFunction("floor").withRange(range)).appendChild(first).withRange(range)
+						}
+
+						case .SQUARE_ROOT {
+							assert(containers.count == 1)
+							kind = .OPERAND
+							node = Node.createCall(Node.createFunction("sqrt").withRange(range)).appendChild(first).withRange(range)
 						}
 					}
 				}
