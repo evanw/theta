@@ -1176,13 +1176,14 @@ namespace Layout {
 						}
 						text += string.fromCodePoint((sibling as Character).codePoint)
 						var codePoint = SUBSTITUTIONS.get(text, INVALID_SUBSTITUTION)
+						var isFunction = codePoint == INVALID_SUBSTITUTION && text in Equation.Parser.FUNCTIONS
 
 						# Prevent substitutions inside incomplete words
-						if codePoint == SKIP_SUBSTITUTION || codePoint == FUNCTION_SUBSTITUTION {
+						if codePoint == SKIP_SUBSTITUTION || isFunction {
 							skipCount = j - i
 
 							# Mark characters that are part of a function
-							if codePoint == FUNCTION_SUBSTITUTION {
+							if isFunction {
 								_generatedFunctionID++
 								for k in i..j + 1 {
 									assert(children[k] is Character)
@@ -1244,11 +1245,10 @@ namespace Layout {
 
 	namespace Editor {
 		const INVALID_SUBSTITUTION = 0
-		const FUNCTION_SUBSTITUTION = -1
-		const SKIP_SUBSTITUTION = -2
-		const ABSOLUTE_VALUE_SUBSTITUTION = -3
-		const CEIL_SUBSTITUTION = -4
-		const FLOOR_SUBSTITUTION = -5
+		const SKIP_SUBSTITUTION = -1
+		const ABSOLUTE_VALUE_SUBSTITUTION = -2
+		const CEIL_SUBSTITUTION = -3
+		const FLOOR_SUBSTITUTION = -4
 		const SUBSTITUTIONS = {
 			"Alpha": 'Α',
 			"alpha": 'α',
@@ -1304,31 +1304,6 @@ namespace Layout {
 			"epsi": SKIP_SUBSTITUTION,
 			"Upsi": SKIP_SUBSTITUTION,
 			"upsi": SKIP_SUBSTITUTION,
-
-			# Functions to recognize but not substitute
-			"acos": FUNCTION_SUBSTITUTION,
-			"acosh": FUNCTION_SUBSTITUTION,
-			"acot": FUNCTION_SUBSTITUTION,
-			"acsc": FUNCTION_SUBSTITUTION,
-			"asec": FUNCTION_SUBSTITUTION,
-			"asin": FUNCTION_SUBSTITUTION,
-			"asinh": FUNCTION_SUBSTITUTION,
-			"atan": FUNCTION_SUBSTITUTION,
-			"atanh": FUNCTION_SUBSTITUTION,
-			"cos": FUNCTION_SUBSTITUTION,
-			"cosh": FUNCTION_SUBSTITUTION,
-			"cot": FUNCTION_SUBSTITUTION,
-			"csc": FUNCTION_SUBSTITUTION,
-			"exp": FUNCTION_SUBSTITUTION,
-			"ln": FUNCTION_SUBSTITUTION,
-			"log": FUNCTION_SUBSTITUTION,
-			"max": FUNCTION_SUBSTITUTION,
-			"min": FUNCTION_SUBSTITUTION,
-			"sec": FUNCTION_SUBSTITUTION,
-			"sin": FUNCTION_SUBSTITUTION,
-			"sinh": FUNCTION_SUBSTITUTION,
-			"tan": FUNCTION_SUBSTITUTION,
-			"tanh": FUNCTION_SUBSTITUTION,
 
 			# Non-character substitutions
 			"abs": ABSOLUTE_VALUE_SUBSTITUTION,

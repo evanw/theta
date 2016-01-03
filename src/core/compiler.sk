@@ -130,13 +130,7 @@ namespace Equation {
 
 				case .FUNCTION, .SYMBOL {
 					var text = node.asString
-					return
-						text == "π" ? Math.PI.toString :
-						text == "e" ? Math.E.toString :
-						text == "θ" ? "theta" :
-						text == "ln" ? "log" :
-						text == "log" ? "log10" :
-						text
+					return SUBSTITUTIONS.get(text, text)
 				}
 
 				case .EQUAL {
@@ -193,6 +187,25 @@ namespace Equation {
 			}
 
 			return "0."
+		}
+	}
+
+	namespace GLSLCompiler {
+		const SUBSTITUTIONS = {
+			"arccos": "acos",
+			"arccosh": "acosh",
+			"arccot": "acot",
+			"arccsc": "acsc",
+			"arcsec": "asec",
+			"arcsin": "asin",
+			"arcsinh": "asinh",
+			"arctan": "atan",
+			"arctanh": "atanh",
+			"e" : "2.718281828459045",
+			"ln" : "log",
+			"log" : "log10",
+			"θ" : "theta",
+			"π" : "3.141592653589793",
 		}
 	}
 }
