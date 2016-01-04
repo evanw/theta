@@ -331,9 +331,7 @@ class HTMLPlatform :: Platform {
 	}
 
 	def setRoute(text string) {
-		if route != null {
-			history.replaceState(null, "", encodeURI(URL_PREFIX + text))
-		}
+		history.replaceState(null, "", encodeURI(URL_PREFIX + text))
 	}
 
 	def route string {
