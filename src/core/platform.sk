@@ -85,4 +85,5 @@ interface Platform {
 	def context GPU.Context
 	def setDelegate(delegate Delegate)
 	def setCursor(cursor Cursor)
+	def parseNumber(text string) double
 }

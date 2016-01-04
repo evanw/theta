@@ -54,7 +54,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_platform = platform
 		_canvas = Canvas.new(platform, fontData)
 		_editor = Layout.Editor.new(_canvas, EDITOR_PADDING, EDITOR_PADDING)
-		_parser = Equation.Parser.new(_log)
+		_parser = Equation.Parser.new(_log, platform)
 		_checker = Equation.Checker.new(_log)
 		_createInitialContent
 		_recompile

@@ -326,6 +326,10 @@ class HTMLPlatform :: Platform {
 			"default"
 	}
 
+	def parseNumber(text string) double {
+		return +(text as dynamic)
+	}
+
 	def _computeCentroid(touches List<HTMLTouch>, centroid Vector) {
 		centroid.set(0, 0)
 		for touch in touches {

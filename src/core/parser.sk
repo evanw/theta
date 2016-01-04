@@ -83,6 +83,7 @@ namespace Equation {
 
 	class Parser {
 		var _log Log
+		const _platform Platform
 
 		def parse(container Layout.Container) Node {
 			return _tokenizeAndParse(container, 0, .LOWEST)
@@ -465,7 +466,7 @@ namespace Equation {
 
 					if text != "." {
 						var range = Range.span(token.range, tokens[j - 1].range)
-						token = Token.new(.OPERAND, range, 0, Node.createNumber(+(text as dynamic)).withRange(range), 0)
+						token = Token.new(.OPERAND, range, 0, Node.createNumber(_platform.parseNumber(text)).withRange(range), 0)
 						tokens.removeRange(i, j)
 						tokens.insert(i, token)
 					}
