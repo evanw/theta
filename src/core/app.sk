@@ -65,11 +65,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	}
 
 	def _createInitialContent {
-		var c = Layout.Container.new
-		c.children.append(Layout.Character.new('y'))
-		c.children.append(Layout.Character.new('≤'))
-		c.children.append(Layout.Character.new('x'))
-		_editor.insert(c)
+		_editor.insert(Layout.Element.deserializeFromString(_platform.route ?? INITIAL_CONTENT[(Math.random * INITIAL_CONTENT.count) as int]))
 		_editor.resetHistory
 	}
 
@@ -383,8 +379,10 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	}
 
 	def _recompile {
+		var container = _editor.cloneContents
 		_log.clear
-		_equation = _parser.parse(_editor.cloneContents)
+		_platform.setRoute(container.serializeToString)
+		_equation = _parser.parse(container)
 		if !_log.hasErrors {
 			_checker.check(_equation)
 		}
@@ -446,6 +444,28 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 namespace App {
 	const CURSOR_BLINK_DELAY = 0.5
 	const EDITOR_PADDING = 20
+
+	const INITIAL_CONTENT = [
+		"(x^2-y^2)^2=4^2",
+		"abs(x^2-1)=abs(y^2-1)",
+		"asintanhy=sinx",
+		"cos(x-sin2y)≤cos(y-sin2x)",
+		"r=2sin7(θ+sinr)",
+		"sin(2lnr+θ)≥0",
+		"sin(x-cosπy)≤sin(y+cosπx)",
+		"sin7θ≥sinr",
+		"sinsqrt(x^2+y^2)+cosx+cosy≤0",
+		"sqrt(x^2+y^2)-cosπx-cosπy≤y",
+		"x-sinπy≤y+sinπx",
+		"x^2+y^2=4",
+		"y=(sinπx)/x",
+		"y=abs(x+2)+abs(x-2)-abs(x)-2",
+		"y=sin(15x+10sinx)",
+		"y=sin(3x+sin4(y+sin2(x+siny)))",
+		"y=x^3-x",
+		"ysqrt(y^2+x^2)=x",
+		"πy=sinπx+sinπy",
+	]
 
 	@entry
 	def main {

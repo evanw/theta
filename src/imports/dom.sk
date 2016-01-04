@@ -2,6 +2,15 @@ if TARGET == .JAVASCRIPT {
 	@import {
 		def requestAnimationFrame(callback fn())
 
+		def unescape(text string) string
+		def escape(text string) string
+
+		def decodeURI(text string) string
+		def encodeURI(text string) string
+
+		def decodeURIComponent(text string) string
+		def encodeURIComponent(text string) string
+
 		type Timeout = int
 		def setTimeout(callback fn(), milliseconds int) Timeout
 		def clearTimeout(timeout Timeout)
@@ -82,6 +91,34 @@ if TARGET == .JAVASCRIPT {
 				assert((self as dynamic).result is string)
 				return (self as dynamic).result
 			}
+		}
+
+		class HTMLHistory {
+			const length int
+			const state dynamic
+
+			def back
+			def forward
+			def go(delta int)
+
+			def pushState(data dynamic, title string, url string)
+			def replaceState(data dynamic, title string, url string)
+		}
+
+		class HTMLLocation {
+			const hash string
+			const host string
+			const hostname string
+			const href string
+			const origin string
+			const pathname string
+			const port string
+			const protocol string
+			const search string
+
+			def assign(url string)
+			def reload
+			def replace(url string)
 		}
 
 		class HTMLWindow {
@@ -526,6 +563,8 @@ if TARGET == .JAVASCRIPT {
 	}
 
 	const window HTMLWindow = dynamic.this.window
+	const history HTMLHistory = dynamic.this.history
 	const document HTMLDocument = dynamic.this.document
+	const location HTMLLocation = dynamic.this.location
 	const navigator HTMLNavigator = dynamic.this.navigator
 }

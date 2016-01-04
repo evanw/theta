@@ -86,4 +86,6 @@ interface Platform {
 	def setDelegate(delegate Delegate)
 	def setCursor(cursor Cursor)
 	def parseNumber(text string) double
+	def setRoute(text string)
+	def route string
 }

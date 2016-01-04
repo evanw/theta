@@ -330,6 +330,17 @@ class HTMLPlatform :: Platform {
 		return +(text as dynamic)
 	}
 
+	def setRoute(text string) {
+		if route != null {
+			history.replaceState(null, "", encodeURI(URL_PREFIX + text))
+		}
+	}
+
+	def route string {
+		var path string = location.pathname
+		return path.startsWith(URL_PREFIX) ? decodeURI(path.slice(URL_PREFIX.count)) : null
+	}
+
 	def _computeCentroid(touches List<HTMLTouch>, centroid Vector) {
 		centroid.set(0, 0)
 		for touch in touches {
@@ -372,6 +383,7 @@ namespace HTMLPlatform {
 		CONTROL
 	}
 
+	const URL_PREFIX = "/app/"
 	const KEY_BACKSPACE = 8
 	const KEY_END = 35
 	const KEY_HOME = 36
