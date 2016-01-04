@@ -1,0 +1,134 @@
+namespace Equation {
+	class Checker {
+		const _log Log
+
+		def check(node Node) {
+			if !node.kind.isBinaryRelational {
+				_log.semanticErrorExpectedRelationalOperator(node.range)
+			}
+
+			_ensureNodeHasType(node)
+		}
+
+		def _expectType(node Node, type Type) {
+			if node.type != type && node.type != .ERROR {
+				_log.semanticErrorUnexpectedType(node.range, node.type, type)
+			}
+		}
+
+		def _expectNumericChildren(node Node) {
+			for child = node.firstChild; child != null; child = child.nextSibling {
+				_expectType(child, .NUMBER)
+			}
+		}
+
+		def _ensureNodeHasType(node Node) {
+			if node.type != null {
+				return
+			}
+
+			node.type = .ERROR
+
+			for child = node.firstChild; child != null; child = child.nextSibling {
+				_ensureNodeHasType(child)
+			}
+
+			switch node.kind {
+				case .SYMBOL {
+					var name = node.asString
+					var type = Variables.table.get(name, null)
+
+					# Do overload resolution using the parent call node
+					if type == null {
+						var function = Functions.table.get(name, null)
+
+						if function != null {
+							var parent = node.parent
+
+							# Make sure inverted functions still work
+							if parent != null && parent.kind == .INVERSE {
+								parent = parent.parent
+							}
+
+							# All functions must be called
+							if parent == null || parent.kind != .CALL {
+								_log.semanticErrorMustCallFunction(node.range, name)
+								type = .ERROR
+							}
+
+							else {
+								var arguments = parent.callArguments
+								var count = arguments.childCount
+
+								# Validate the argument count
+								if count < function.minArgumentCount || function.maxArgumentCount != FunctionType.UNLIMITED_ARGUMENT_COUNT && count > function.maxArgumentCount {
+									_log.semanticErrorInvalidArgumentCount(arguments.range, name, count)
+									type = .ERROR
+								}
+
+								else {
+									type = function
+								}
+							}
+						}
+					}
+
+					if type == null {
+						_log.semanticErrorUndefinedSymbol(node.range, name)
+					} else {
+						node.type = type
+					}
+				}
+
+				case .INVERSE {
+					var value = node.unaryValue
+					if value.kind == .SYMBOL && value.type is FunctionType {
+						var inverse = Functions.inverseFunctionName(value.asString)
+						if inverse == null {
+							_log.semanticErrorMissingInverse(value.range, value.asString)
+						} else {
+							node.become(Node.createSymbol(inverse).withRange(node.range))
+							assert(node.type == null)
+							_ensureNodeHasType(node)
+						}
+					} else if value.type != .ERROR {
+						_log.semanticErrorInvalidInverse(value.range, value.type)
+					}
+				}
+
+				case .EQUAL, .GREATER_THAN, .GREATER_THAN_EQUAL, .LESS_THAN, .LESS_THAN_EQUAL {
+					if node.parent != null {
+						_log.semanticErrorUnexpectedRelationalOperator(node.internalRangeOrRange)
+					} else {
+						_expectNumericChildren(node)
+						node.type = .BOOLEAN
+					}
+				}
+
+				case .ADD, .DIVIDE, .MULTIPLY, .FACTORIAL, .NEGATE {
+					_expectNumericChildren(node)
+					node.type = .NUMBER
+				}
+
+				case .CALL {
+					var value = node.callValue
+					if value.kind == .SYMBOL && value.type is FunctionType {
+						_expectNumericChildren(node.callArguments)
+						node.type = .NUMBER
+					} else if value.type != .ERROR {
+						_log.semanticErrorInvalidCall(value.range, value.type)
+					}
+				}
+
+				case .TUPLE {
+					_expectNumericChildren(node)
+					if node.hasOneChild && (node.parent == null || node.parent.kind != .CALL) {
+						node.become(node.firstChild.remove)
+					} else {
+						node.type = TupleType.new(node.childCount)
+					}
+				}
+			}
+		}
+	}
+}

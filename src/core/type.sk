@@ -1,0 +1,39 @@
+class Type {
+	def toString string
+}
+
+namespace Type {
+	const ERROR = SpecialType.new("<error>")
+	const BOOLEAN = SpecialType.new("boolean")
+	const FUNCTION = SpecialType.new("function")
+	const NUMBER = SpecialType.new("number")
+}
+
+class SpecialType : Type {
+	const name string
+
+	over toString string {
+		return name
+	}
+}
+
+class TupleType : Type {
+	const count int
+
+	over toString string {
+		return "\(count)-tuple"
+	}
+}
+
+class FunctionType : Type {
+	const minArgumentCount int
+	const maxArgumentCount int # Pass UNLIMITED_ARGUMENT_COUNT for functions that can take any number of arguments
+
+	over toString string {
+		return "function"
+	}
+}
+
+namespace FunctionType {
+	const UNLIMITED_ARGUMENT_COUNT = -1
+}

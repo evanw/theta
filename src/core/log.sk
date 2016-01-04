@@ -1,0 +1,94 @@
+namespace Equation {
+	class Range {
+		const start int
+		const end int
+	}
+
+	namespace Range {
+		def span(start Range, end Range) Range {
+			if start == null { return end }
+			if end == null { return start }
+			assert(start.start <= end.end)
+			return Range.new(start.start, end.end)
+		}
+	}
+
+	class Diagnostic {
+		const range Range
+		const message string
+	}
+
+	class Log {
+		var _errors List<Diagnostic> = []
+
+		def errors List<Diagnostic> {
+			return _errors
+		}
+
+		def hasErrors bool {
+			return !errors.isEmpty
+		}
+
+		def clear {
+			_errors = []
+		}
+
+		def error(range Range, message string) {
+			_errors.append(Diagnostic.new(range, message))
+		}
+	}
+
+	class Log {
+		def syntaxErrorUnexpectedToken(token Token) {
+			if token.kind == .END_OF_INPUT {
+				error(token.range, "Expected an expression")
+			} else {
+				error(token.range, "Unexpected " + (
+					token.kind == .CODE_POINT ? "“" + string.fromCodePoint(Layout.Character.substituteCodePoint(token.codePoint)) + "”" :
+					token.kind == .OVER ? "exponent" :
+					token.kind == .UNDER ? "subscript" :
+					"expression"))
+			}
+		}
+
+		def syntaxErrorFunctionExponentiation(range Range) {
+			error(range, "Cannot use an exponent on a function")
+		}
+
+		def semanticErrorUnexpectedType(range Range, found Type, expected Type) {
+			error(range, "Unexpected \(found), expected a \(expected) instead")
+		}
+
+		def semanticErrorExpectedRelationalOperator(range Range) {
+			error(range, "Expected a top-level relational operator (either =, <, >, ≤, or ≥)")
+		}
+
+		def semanticErrorUnexpectedRelationalOperator(range Range) {
+			error(range, "Unexpected relational operator")
+		}
+
+		def semanticErrorInvalidInverse(range Range, type Type) {
+			error(range, "Cannot invert a \(type)")
+		}
+
+		def semanticErrorMissingInverse(range Range, name string) {
+			error(range, "Inverting the function is “\(name)” not supported")
+		}
+
+		def semanticErrorInvalidCall(range Range, type Type) {
+			error(range, "Cannot call a \(type)")
+		}
+
+		def semanticErrorMustCallFunction(range Range, name string) {
+			error(range, "The function “\(name)” must be called")
+		}
+
+		def semanticErrorInvalidArgumentCount(range Range, name string, count int) {
+			error(range, "No version of the function “\(name)” takes \(count) argument" + (count == 1 ? "" : "s"))
+		}
+
+		def semanticErrorUndefinedSymbol(range Range, name string) {
+			error(range, "The symbol “\(name)” is not defined")
+		}
+	}
+}

@@ -36,7 +36,8 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	var _mouseAction MouseAction = .NONE
 
 	# Compilation support
-	var _parser Equation.Parser
+	var _parser Equation.Parser = null
+	var _checker Equation.Checker = null
 	var _equation Equation.Node = null
 	var _log = Equation.Log.new
 
@@ -54,6 +55,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_canvas = Canvas.new(platform, fontData)
 		_editor = Layout.Editor.new(_canvas, EDITOR_PADDING, EDITOR_PADDING)
 		_parser = Equation.Parser.new(_log)
+		_checker = Equation.Checker.new(_log)
 		_createInitialContent
 		_recompile
 		_resetCursorBlink
@@ -336,10 +338,11 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		}
 
 		# Opening brackets (and closing brackets when the cases above don't apply)
-		else if c == '^' || c == '_' || c == '|' || c == '[' || c == ']' || c == '(' || c == ')' {
+		else if c == '^' || c == '_' || c == '√' || c == '|' || c == '[' || c == ']' || c == '(' || c == ')' {
 			var special = Layout.Special.new(
 				c == '^' ? .OVER :
 				c == '_' ? .UNDER :
+				c == '√' ? .SQUARE_ROOT :
 				c == '|' ? .ABSOLUTE_VALUE :
 				c == '[' || c == ']' ? .BRACKETS :
 				.PARENTHESES)
@@ -382,7 +385,10 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	def _recompile {
 		_log.clear
 		_equation = _parser.parse(_editor.cloneContents)
-		if !_log.errors.isEmpty {
+		if !_log.hasErrors {
+			_checker.check(_equation)
+		}
+		if _log.hasErrors {
 			_equation = null
 		}
 	}
@@ -425,10 +431,10 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_canvas.flushText(.BLACK)
 		_canvas.flushSmoothGeometry
 
-		if !_log.errors.isEmpty {
+		if _log.hasErrors {
 			var error = _log.errors.first
 			_editor.renderErrorForRange(error.range.start, error.range.end)
-			_canvas.addText(error.message, EDITOR_PADDING, _editor.box.y + _editor.box.height + EDITOR_PADDING, Layout.Element.MIN_FONT_SIZE, .PREFER_NORMAL)
+			_canvas.addText("Error: " + error.message, EDITOR_PADDING, _editor.box.y + _editor.box.height + EDITOR_PADDING, Layout.Element.MIN_FONT_SIZE, .PREFER_NORMAL)
 			_canvas.flushText(.RED)
 			_canvas.flushSmoothGeometry
 		}

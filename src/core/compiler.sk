@@ -124,13 +124,14 @@ namespace Equation {
 		def _compile(node Node) string {
 			switch node.kind {
 				case .NUMBER {
-					var text = node.asDouble.toString
+					var text = node.asNumber.toString
 					return "." in text ? text : text + ".0"
 				}
 
-				case .FUNCTION, .SYMBOL {
+				case .SYMBOL {
 					var text = node.asString
-					return SUBSTITUTIONS.get(text, text)
+					text = SUBSTITUTIONS.get(text, text)
+					return text
 				}
 
 				case .EQUAL {
@@ -157,6 +158,10 @@ namespace Equation {
 					return "(" + _compile(node.binaryLeft) + ")/(" + _compile(node.binaryRight) + ")"
 				}
 
+				case .EXPONENT {
+					return "pow(" + _compile(node.binaryLeft) + "," + _compile(node.binaryRight) + ")"
+				}
+
 				case .ADD, .MULTIPLY {
 					var text = node.hasChildren ? "" : node.kind == .ADD ? "0." : "1."
 					for child = node.firstChild; child != null; child = child.nextSibling {
@@ -171,32 +176,34 @@ namespace Equation {
 				case .CALL {
 					var text = _compile(node.callValue)
 					_functions[text] = 0
-					text += "("
-					for child = node.callValue.nextSibling; child != null; child = child.nextSibling {
-						text += _compile(child)
-						if child.nextSibling != null {
-							text += ","
+					if text == "min" || text == "max" {
+						return _compileVariableArgumentCall(text, node.callArguments.firstChild)
+					} else {
+						text += "("
+						for child = node.callArguments.firstChild; child != null; child = child.nextSibling {
+							text += _compile(child)
+							if child.nextSibling != null {
+								text += ","
+							}
 						}
+						return text + ")"
 					}
-					return text + ")"
 				}
 			}
 
 			return "0."
 		}
+
+		def _compileVariableArgumentCall(name string, argument Node) string {
+			assert(argument.nextSibling != null)
+			return name + "(" + _compile(argument) + "," + (argument.nextSibling.nextSibling == null
+				? _compile(argument.nextSibling) :
+				_compileVariableArgumentCall(name, argument.nextSibling)) + ")"
+		}
 	}
 
 	namespace GLSLCompiler {
 		const SUBSTITUTIONS = {
-			"arccos": "acos",
-			"arccosh": "acosh",
-			"arccot": "acot",
-			"arccsc": "acsc",
-			"arcsec": "asec",
-			"arcsin": "asin",
-			"arcsinh": "asinh",
-			"arctan": "atan",
-			"arctanh": "atanh",
 			"e" : "2.718281828459045",
 			"ln" : "log",
 			"log" : "log10",

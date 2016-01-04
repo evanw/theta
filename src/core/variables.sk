@@ -1,0 +1,10 @@
+namespace Variables {
+	const table StringMap<Type> = {
+		"e": .NUMBER,
+		"r": .NUMBER,
+		"x": .NUMBER,
+		"y": .NUMBER,
+		"θ": .NUMBER,
+		"π": .NUMBER,
+	}
+}

@@ -28,3 +28,6 @@ watch-glsl: | node_modules
 
 node_modules:
 	npm install
+
+clean:
+	rm -f src/core/shaders.sk www/compiled.js

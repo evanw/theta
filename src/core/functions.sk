@@ -1,0 +1,82 @@
+namespace Functions {
+	var _table StringMap<FunctionType> = null
+
+	const _substitutions = {
+		"arccos": "acos",
+		"arccosh": "acosh",
+		"arccot": "acot",
+		"arccsc": "acsc",
+		"arcsec": "asec",
+		"arcsin": "asin",
+		"arcsinh": "asinh",
+		"arctan": "atan",
+		"arctanh": "atanh",
+	}
+
+	const _inverses = {
+		"cos": "acos", "acos": "cos",
+		"cosh": "acosh", "acosh": "cosh",
+		"cot": "acot", "acot": "cot",
+		"csc": "acsc", "acsc": "csc",
+		"exp": "ln", "ln": "exp",
+		"sec": "asec", "asec": "sec",
+		"sin": "asin", "asin": "sin",
+		"sinh": "asinh", "asinh": "sinh",
+		"tan": "atan", "atan": "tan",
+		"tanh": "atanh", "atanh": "tanh",
+	}
+
+	def canonicalFunctionName(name string) string {
+		name = _substitutions.get(name, name)
+		return name in table ? name : null
+	}
+
+	def inverseFunctionName(name string) string {
+		return _inverses.get(name, null)
+	}
+
+	def table StringMap<FunctionType> {
+		if _table == null {
+			var t1 = FunctionType.new(1, 1)
+			var t12 = FunctionType.new(1, 2)
+			var t2n = FunctionType.new(2, -1)
+
+			_table = {
+				# 1 argument
+				"abs": t1,
+				"acos": t1,
+				"acosh": t1,
+				"acot": t1,
+				"acsc": t1,
+				"asec": t1,
+				"asin": t1,
+				"asinh": t1,
+				"atanh": t1,
+				"ceil": t1,
+				"cos": t1,
+				"cosh": t1,
+				"cot": t1,
+				"csc": t1,
+				"exp": t1,
+				"floor": t1,
+				"ln": t1,
+				"log": t1,
+				"sec": t1,
+				"sin": t1,
+				"sinh": t1,
+				"sqrt": t1,
+				"tan": t1,
+				"tanh": t1,
+
+				# 1 or 2 arguments
+				"atan": t12,
+
+				# Unlimited arguments
+				"max": t2n,
+				"min": t2n,
+			}
+		}
+
+		return _table
+	}
+}

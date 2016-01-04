@@ -2,7 +2,6 @@ namespace Equation {
 	enum NodeKind {
 		# Operand
 		ERROR
-		FUNCTION
 		NUMBER
 		SYMBOL
 
@@ -13,6 +12,9 @@ namespace Equation {
 
 		# Binary
 		DIVIDE
+		EXPONENT
+
+		# Binary relational
 		EQUAL
 		GREATER_THAN
 		GREATER_THAN_EQUAL
@@ -36,58 +38,17 @@ namespace Equation {
 		def isBinary bool {
 			return self >= DIVIDE && self <= LESS_THAN_EQUAL
 		}
-	}
 
-	class Range {
-		const start int
-		const end int
-	}
-
-	namespace Range {
-		def span(start Range, end Range) Range {
-			if start == null { return end }
-			if end == null { return start }
-			assert(start.start <= end.end)
-			return Range.new(start.start, end.end)
-		}
-	}
-
-	type Type : int {
-		def isTuple bool {
-			return (self as int) > 1
-		}
-
-		def tupleCount int {
-			assert(isTuple)
-			return self as int
-		}
-
-		def toString string {
-			if self == NONE { return "none" }
-			if self == BOOLEAN { return "boolean" }
-			if self == NUMBER { return "number" }
-			if self == FUNCTION { return "function" }
-			assert(isTuple)
-			return "\(tupleCount)-tuple"
-		}
-	}
-
-	namespace Type {
-		const NONE = 0 as Type
-		const BOOLEAN = -1 as Type
-		const FUNCTION = -2 as Type
-		const NUMBER = 1 as Type
-
-		def tuple(x int) Type {
-			assert(x > 1)
-			return x as Type
+		def isBinaryRelational bool {
+			return self >= EQUAL && self <= LESS_THAN_EQUAL
 		}
 	}
 
 	class Node {
 		var kind NodeKind
 		var range Range = null
-		var type Type = .NONE
+		var internalRange Range = null
+		var type Type = null
 		var _value = 0.0
 		var _text string = null
 
@@ -98,19 +59,38 @@ namespace Equation {
 		var _previousSibling Node = null
 		var _nextSibling Node = null
 
+		def _copyMembersFrom(node Node) {
+			range = node.range
+			internalRange = node.internalRange
+			type = node.type
+			_value = node._value
+			_text = node._text
+		}
+
 		def clone Node {
-			var clone = new(kind)
-
-			clone.range = range
-			clone.type = type
-			clone._value = _value
-			clone._text = _text
-
+			var node = new(kind)
+			node._copyMembersFrom(self)
 			for child = _firstChild; child != null; child = child._nextSibling {
-				clone.appendChild(child.clone)
+				node.appendChild(child.clone)
 			}
+			return node
+		}
 
-			return clone
+		# Change self node in place to become the provided node. The parent node is
+		# not changed, so become() can be called within a nested method and does not
+		# need to report the updated node reference to the caller since the reference
+		# does not change.
+		def become(node Node) {
+			assert(node._parent == null)
+			if node == self {
+				return
+			}
+			kind = node.kind
+			_copyMembersFrom(node)
+			while hasChildren {
+				firstChild.remove
+			}
+			appendChildrenFrom(node)
 		}
 
 		def parent Node {
@@ -151,14 +131,14 @@ namespace Equation {
 			return count
 		}
 
-		def withValue(value double) Node {
+		def withNumber(value double) Node {
 			assert(kind == .NUMBER)
 			_value = value
 			return self
 		}
 
-		def withText(value string) Node {
-			assert(kind == .FUNCTION || kind == .SYMBOL)
+		def withString(value string) Node {
+			assert(kind == .SYMBOL)
 			_text = value
 			return self
 		}
@@ -171,6 +151,15 @@ namespace Equation {
 		def withRange(value Range) Node {
 			range = value
 			return self
+		}
+
+		def withInternalRange(value Range) Node {
+			internalRange = value
+			return self
+		}
+
+		def internalRangeOrRange Range {
+			return internalRange ?? range
 		}
 
 		def withRangeFromChildren Node {
@@ -200,15 +189,15 @@ namespace Equation {
 			return self
 		}
 
-    def appendChildrenFrom(node Node) Node {
-      assert(node != self)
+		def appendChildrenFrom(node Node) Node {
+			assert(node != self)
 
-      while node.hasChildren {
-        appendChild(node._firstChild.remove)
-      }
+			while node.hasChildren {
+				appendChild(node.firstChild.remove)
+			}
 
-      return self
-    }
+			return self
+		}
 
 		def remove Node {
 			assert(_parent != null)
@@ -245,11 +234,11 @@ namespace Equation {
 					b = b.nextSibling
 				}
 
-				if kind == .NUMBER && asDouble != other.asDouble {
+				if kind == .NUMBER && asNumber != other.asNumber {
 					return false
 				}
 
-				if (kind == .FUNCTION || kind == .SYMBOL) && asString != other.asString {
+				if kind == .SYMBOL && asString != other.asString {
 					return false
 				}
 
@@ -261,13 +250,13 @@ namespace Equation {
 	}
 
 	class Node {
-		def asDouble double {
+		def asNumber double {
 			assert(kind == .NUMBER)
 			return _value
 		}
 
 		def asString string {
-			assert(kind == .FUNCTION || kind == .SYMBOL)
+			assert(kind == .SYMBOL)
 			return _text
 		}
 
@@ -291,14 +280,22 @@ namespace Equation {
 
 		def callValue Node {
 			assert(kind == .CALL)
-			assert(childCount >= 1)
+			assert(childCount == 2)
+			assert(_firstChild.kind == .SYMBOL)
 			return _firstChild
+		}
+
+		def callArguments Node {
+			assert(kind == .CALL)
+			assert(childCount == 2)
+			assert(_lastChild.kind == .TUPLE)
+			return _lastChild
 		}
 
 		# This is just for debugging
 		def toString string {
-			if kind == .NUMBER { return asDouble.toString }
-			if kind == .FUNCTION || kind == .SYMBOL { return asString }
+			if kind == .NUMBER { return asNumber.toString }
+			if kind == .SYMBOL { return asString }
 
 			# Use nested S-expressions for display
 			var text = kind.toString
@@ -318,16 +315,12 @@ namespace Equation {
 			return new(.ERROR)
 		}
 
-		def createFunction(text string) Node {
-			return new(.FUNCTION).withText(text)
-		}
-
 		def createNumber(value double) Node {
-			return new(.NUMBER).withValue(value).withType(.NUMBER)
+			return new(.NUMBER).withNumber(value).withType(.NUMBER)
 		}
 
 		def createSymbol(text string) Node {
-			return new(.SYMBOL).withText(text)
+			return new(.SYMBOL).withString(text)
 		}
 
 		def createUnary(kind NodeKind, value Node) Node {
@@ -344,8 +337,14 @@ namespace Equation {
 			return new(.ADD)
 		}
 
-		def createCall(value Node) Node {
-			return new(.CALL).appendChild(value)
+		def createCall(value Node, arguments Node) Node {
+			assert(value.kind == .SYMBOL || value.kind == .INVERSE)
+			assert(arguments.kind == .TUPLE)
+			return new(.CALL).appendChild(value).appendChild(arguments)
+		}
+
+		def createSingleArgumentCall(value Node, argument Node) Node {
+			return createCall(value, Node.createTuple.appendChild(argument))
 		}
 
 		def createMultiply Node {

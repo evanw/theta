@@ -152,19 +152,19 @@ class Canvas :: Layout.Renderer {
 		# Triangle
 		if x1 == x2 {
 			_smooth.fillConvexPolygon([
-				Vector.new(x1, y),
-				Vector.new(x1 + 3, y + 4),
-				Vector.new(x1 - 3, y + 4),
+				Vector.new(x1, y - 1),
+				Vector.new(x1 + 3, y + 3),
+				Vector.new(x1 - 3, y + 3),
 			], .RED)
 		}
 
 		# Squiggle
 		else {
 			var line List<Vector> = []
-			var zigzag = 0
+			var zigzag = -1
 			for x = x1; x < x2; x += 2 {
 				line.append(Vector.new(x, y + zigzag))
-				zigzag = zigzag == 0 ? 2 : 0
+				zigzag = -zigzag
 			}
 			_smooth.strokeNonOverlappingPolyline(line, .RED, 1, .OPEN)
 		}
@@ -291,7 +291,7 @@ class Canvas :: Layout.Renderer {
 
 			# Report the error for debugging
 			catch e dynamic {
-				console.error(e)
+				console.error(e, source)
 			}
 		}
 

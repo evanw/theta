@@ -9,7 +9,6 @@ namespace Equation {
 
 	enum Precedence {
 		LOWEST
-		TUPLE
 		EQUAL
 		ADD
 		MULTIPLY
@@ -19,15 +18,16 @@ namespace Equation {
 
 	################################################################################
 
+	flags TokenFlags {
+		IS_FUNCTION
+	}
+
 	class Token {
 		const kind TokenKind
 		const range Range
 		const codePoint int
 		const node Node
-
-		def isParenthesizedOperand bool {
-			return kind == .OPERAND && codePoint == PARENTHESIZED_CODE_POINT
-		}
+		const flags TokenFlags
 
 		def isWord bool {
 			return kind == .CODE_POINT && Glyph.isWordCodePoint(codePoint)
@@ -36,10 +36,6 @@ namespace Equation {
 		def isNumber bool {
 			return kind == .CODE_POINT && (codePoint >= '0' && codePoint <= '9' || codePoint == '.')
 		}
-	}
-
-	namespace Token {
-		const PARENTHESIZED_CODE_POINT = 1
 	}
 
 	################################################################################
@@ -85,43 +81,11 @@ namespace Equation {
 
 	################################################################################
 
-	class Diagnostic {
-		const range Range
-		const message string
-	}
-
-	class Log {
-		var _errors List<Diagnostic> = []
-
-		def errors List<Diagnostic> {
-			return _errors
-		}
-
-		def clear {
-			_errors = []
-		}
-
-		def error(range Range, message string) {
-			_errors.append(Diagnostic.new(range, message))
-		}
-
-		def syntaxErrorUnexpectedToken(token Token) {
-			error(token.range, "Unexpected " + (
-				token.kind == .CODE_POINT ? "“" + string.fromCodePoint(Layout.Character.substituteCodePoint(token.codePoint)) + "”" :
-				token.kind == .END_OF_INPUT ? "end of input" :
-				token.kind == .OVER ? "exponent" :
-				token.kind == .UNDER ? "subscript" :
-				"expression"))
-		}
-	}
-
-	################################################################################
-
 	class Parser {
 		var _log Log
 
 		def parse(container Layout.Container) Node {
-			return _tokenizeAndParse(container, 0, .TUPLE)
+			return _tokenizeAndParse(container, 0, .LOWEST)
 		}
 
 		def _prefix(context ParserContext) Node {
@@ -132,29 +96,37 @@ namespace Equation {
 				context.next
 
 				# All functions must be called
-				if token.node.kind == .FUNCTION {
-					# Handle an exponent on the function itself
-					var power = context.current
-					if power.kind == .OVER {
-						context.next
-					} else {
-						power = null
+				if .IS_FUNCTION in token.flags {
+					var target = token.node
+					var argument Node = null
+
+					# Handle an exponent on the function itself ("sin^2 x")
+					if context.current.kind == .OVER {
+						var power = context.next
+
+						# Special-case "-1" to mean calling the inverse function
+						if power.node.kind == .NUMBER && power.node.asNumber == -1 {
+							target = Node.createUnary(.INVERSE, token.node).withRange(Range.span(token.node.range, power.range))
+						}
+
+						# Forbid function exponent notation because it's ambiguous, confusing, and easy to work around
+						else {
+							_log.syntaxErrorFunctionExponentiation(power.node.range)
+						}
 					}
 
-					# Special-case "-1" to mean calling the inverse function
-					var isInverse = power != null && power.node.kind == .NUMBER && power.node.asDouble == -1
-					var call = Node.createCall(isInverse ? Node.createUnary(.INVERSE, token.node).withRange(token.range) : token.node)
-
-					# Handle a single argument (check for a parenthesized operand first to differentiate "sin(x^2)" from "sin(x)^2")
-					var hasExplicitParentheses = context.current.isParenthesizedOperand
-					var argument = hasExplicitParentheses ? context.next.node : _parse(context, .MULTIPLY)
-					if argument == null {
-						return null
+					# Check for a parenthesized operand first so "sin(x)^2" is parsed as "(sin x)^2" and not "sin(x^2)"
+					if context.current.kind == .OPERAND && context.current.node.kind == .TUPLE {
+						argument = context.next.node
 					}
 
 					# Handle implicit compound arguments ("sin 2x cos -3y - tan 4z*5" => "sin(2x) cos(-3y) - tan(4z)*5")
-					if !hasExplicitParentheses {
-						while context.current.kind == .OPERAND && context.current.node.kind != .FUNCTION {
+					else {
+						argument = _parse(context, .MULTIPLY)
+						if argument == null {
+							return null
+						}
+						while context.current.kind == .OPERAND && !(.IS_FUNCTION in context.current.flags) {
 							var right = _parse(context, .MULTIPLY)
 							if right == null {
 								return null
@@ -164,19 +136,7 @@ namespace Equation {
 					}
 
 					# Handle multiple arguments
-					if argument.kind == .TUPLE {
-						call.appendChildrenFrom(argument)
-					} else {
-						call.appendChild(argument)
-					}
-					call.withRangeFromChildren
-
-					# Handle an exponent on the function itself
-					if power != null && !isInverse {
-						call = Node.createCall(Node.createFunction("pow")).appendChild(call).appendChild(power.node).withRange(call.range)
-					}
-
-					return call
+					return Node.createCall(target, argument.kind == .TUPLE ? argument : Node.createTuple.appendChild(argument).withRangeFromChildren).withRangeFromChildren
 				}
 
 				return token.node
@@ -198,7 +158,7 @@ namespace Equation {
 						}
 
 						# Automatically update the sign of numeric literals in place
-						return _negate(value).withRange(Range.span(token.range, value.range))
+						return _negate(value, token.range)
 					}
 				}
 			}
@@ -237,23 +197,10 @@ namespace Equation {
 						return _join(.MULTIPLY, left, right)
 					}
 
-					case ',' {
-						left = Node.createTuple.appendChild(left)
-						while true {
-							var right = _parse(context, .TUPLE)
-							if right == null {
-								return null
-							}
-							left.appendChild(right)
-							if !context.eat(',') {
-								break
-							}
-						}
-						return left.withRangeFromChildren
-					}
-
 					case '=', '<', '>', '≤', '≥', '÷' {
-						var right = _parse(context, c == '÷' ? .MULTIPLY : .EQUAL)
+						var right = _parse(context, c == '÷' ? .MULTIPLY :
+							# Relational operators are right-associative
+							(Precedence.EQUAL - 1) as Precedence)
 						if right == null {
 							return null
 						}
@@ -263,7 +210,7 @@ namespace Equation {
 							c == '≤' ? .LESS_THAN_EQUAL :
 							c == '≥' ? .GREATER_THAN_EQUAL :
 							c == '÷' ? .DIVIDE :
-							.EQUAL, left, right).withRangeFromChildren
+							.EQUAL, left, right).withRangeFromChildren.withInternalRange(token.range)
 					}
 
 					case '+', '-' {
@@ -272,7 +219,7 @@ namespace Equation {
 							return null
 						}
 						if c == '-' {
-							right = _negate(right).withRange(Range.span(token.range, right.range))
+							right = _negate(right, token.range)
 						}
 						return _join(.ADD, left, right)
 					}
@@ -282,11 +229,37 @@ namespace Equation {
 			# Over tokens
 			if token.kind == .OVER {
 				context.next
-				return Node.createCall(Node.createFunction("pow").withRange(token.range)).appendChild(left).appendChild(token.node).withRangeFromChildren
+				return Node.createBinary(.EXPONENT, left, token.node).withRange(token.range)
 			}
 
 			context.unexpectedToken
 			return null
+		}
+
+		def _tokenizeAndParseTuple(container Layout.Container, baseIndex int) Node {
+			var context = _tokenize(container, baseIndex)
+			var node = Node.createTuple
+
+			# Parse
+			while true {
+				var child = _parse(context, .LOWEST)
+				if child == null {
+					node = Node.createError
+					break
+				}
+				node.appendChild(child)
+				if !context.eat(',') {
+					break
+				}
+			}
+
+			# Make sure everything was parsed
+			if context.hasMoreTokens {
+				context.unexpectedToken
+				node = Node.createError
+			}
+
+			return node.withRange(Range.new(baseIndex - 1, baseIndex + container.anchorCount))
 		}
 
 		def _tokenizeAndParse(container Layout.Container, baseIndex int, precedence Precedence) Node {
@@ -309,7 +282,6 @@ namespace Equation {
 						case '+', '-' { return precedence < Precedence.ADD }
 						case '*', '÷' { return precedence < Precedence.MULTIPLY }
 						case '!' { return precedence < Precedence.POSTFIX }
-						case ',' { return precedence < Precedence.TUPLE }
 					}
 				}
 				case .END_OF_INPUT {}
@@ -350,6 +322,7 @@ namespace Equation {
 				var kind TokenKind
 				var codePoint = 0
 				var node Node = null
+				var flags TokenFlags = 0
 
 				# Character elements
 				if child is Layout.Character {
@@ -362,62 +335,70 @@ namespace Equation {
 					assert(child is Layout.Special)
 					var special = child as Layout.Special
 					var containers = special.children
-					assert(!containers.isEmpty)
-					var first = _tokenizeAndParse(containers[0], baseIndex + 1, special.kind == .PARENTHESES ? .LOWEST : .TUPLE)
 
-					switch special.kind {
-						case .FRACTION {
-							assert(containers.count == 2)
-							kind = .OPERAND
-							node = Node.createBinary(.DIVIDE, first, _tokenizeAndParse(containers[1], baseIndex + 1 + containers[0].anchorCount, .TUPLE)).withRange(range)
-						}
+					if special.kind == .PARENTHESES {
+						assert(containers.count == 1)
+						kind = .OPERAND
+						node = _tokenizeAndParseTuple(containers[0], baseIndex + 1)
+					}
 
-						case .OVER {
-							assert(containers.count == 1)
-							kind = .OVER
-							node = first
-						}
+					else {
+						assert(!containers.isEmpty)
+						var first = _tokenizeAndParse(containers[0], baseIndex + 1, .LOWEST)
 
-						case .UNDER {
-							assert(containers.count == 1)
-							kind = .UNDER
-							node = first
-						}
+						switch special.kind {
+							case .FRACTION {
+								assert(containers.count == 2)
+								kind = .OPERAND
+								node = Node.createBinary(.DIVIDE, first, _tokenizeAndParse(containers[1], baseIndex + 1 + containers[0].anchorCount, .LOWEST)).withRange(range)
+							}
 
-						case .PARENTHESES, .BRACKETS {
-							assert(containers.count == 1)
-							kind = .OPERAND
-							node = first
-							codePoint = Token.PARENTHESIZED_CODE_POINT
-						}
+							case .OVER {
+								assert(containers.count == 1)
+								kind = .OVER
+								node = first
+							}
 
-						case .ABSOLUTE_VALUE {
-							assert(containers.count == 1)
-							kind = .OPERAND
-							node = Node.createCall(Node.createFunction("abs").withRange(range)).appendChild(first).withRange(range)
-						}
+							case .UNDER {
+								assert(containers.count == 1)
+								kind = .UNDER
+								node = first
+							}
 
-						case .CEIL {
-							assert(containers.count == 1)
-							kind = .OPERAND
-							node = Node.createCall(Node.createFunction("ceil").withRange(range)).appendChild(first).withRange(range)
-						}
+							case .BRACKETS {
+								assert(containers.count == 1)
+								kind = .OPERAND
+								node = first
+							}
 
-						case .FLOOR {
-							assert(containers.count == 1)
-							kind = .OPERAND
-							node = Node.createCall(Node.createFunction("floor").withRange(range)).appendChild(first).withRange(range)
-						}
+							case .ABSOLUTE_VALUE {
+								assert(containers.count == 1)
+								kind = .OPERAND
+								node = Node.createSingleArgumentCall(Node.createSymbol("abs").withRange(range), first).withRange(range)
+							}
 
-						case .SQUARE_ROOT {
-							assert(containers.count == 1)
-							kind = .OPERAND
-							node = Node.createCall(Node.createFunction("sqrt").withRange(range)).appendChild(first).withRange(range)
+							case .CEIL {
+								assert(containers.count == 1)
+								kind = .OPERAND
+								node = Node.createSingleArgumentCall(Node.createSymbol("ceil").withRange(range), first).withRange(range)
+							}
+
+							case .FLOOR {
+								assert(containers.count == 1)
+								kind = .OPERAND
+								node = Node.createSingleArgumentCall(Node.createSymbol("floor").withRange(range), first).withRange(range)
+							}
+
+							case .SQUARE_ROOT {
+								assert(containers.count == 1)
+								kind = .OPERAND
+								node = Node.createSingleArgumentCall(Node.createSymbol("sqrt").withRange(range), first).withRange(range)
+							}
 						}
 					}
 				}
 
-				tokens.append(Token.new(kind, range, codePoint, node))
+				tokens.append(Token.new(kind, range, codePoint, node, flags))
 				baseIndex = nextBaseIndex
 			}
 
@@ -442,15 +423,16 @@ namespace Equation {
 						text += string.fromCodePoint(other.codePoint)
 
 						# Always match at least a single character word
-						if matchCount == 0 || text in FUNCTIONS {
-							match = text
+						var canonical = Functions.canonicalFunctionName(text)
+						if matchCount == 0 || canonical != null {
+							match = canonical ?? text
 							matchCount = j - i + 1
 						}
 					}
 
 					if matchCount != 0 {
 						var range = Range.span(token.range, tokens[i + matchCount - 1].range)
-						token = Token.new(.OPERAND, range, 0, (matchCount != 1 ? Node.createFunction(match) : Node.createSymbol(match)).withRange(range))
+						token = Token.new(.OPERAND, range, 0, Node.createSymbol(match).withRange(range), matchCount != 1 ? .IS_FUNCTION : 0)
 						tokens.removeRange(i, i + matchCount)
 						tokens.insert(i, token)
 					}
@@ -483,7 +465,7 @@ namespace Equation {
 
 					if text != "." {
 						var range = Range.span(token.range, tokens[j - 1].range)
-						token = Token.new(.OPERAND, range, 0, Node.createNumber(+(text as dynamic)).withRange(range))
+						token = Token.new(.OPERAND, range, 0, Node.createNumber(+(text as dynamic)).withRange(range), 0)
 						tokens.removeRange(i, j)
 						tokens.insert(i, token)
 					}
@@ -493,53 +475,17 @@ namespace Equation {
 			}
 
 			# Every token stream must end in an "end of input" token
-			tokens.append(Token.new(.END_OF_INPUT, Range.new(baseIndex, baseIndex), 0, null))
+			tokens.append(Token.new(.END_OF_INPUT, Range.new(baseIndex, baseIndex), 0, null, 0))
 
 			return ParserContext.new(_log, tokens)
 		}
 	}
 
 	namespace Parser {
-		const FUNCTIONS = {
-			"acos": 0,
-			"acosh": 0,
-			"acot": 0,
-			"acsc": 0,
-			"arccos": 0,
-			"arccosh": 0,
-			"arccot": 0,
-			"arccsc": 0,
-			"arcsec": 0,
-			"arcsin": 0,
-			"arcsinh": 0,
-			"arctan": 0,
-			"arctanh": 0,
-			"asec": 0,
-			"asin": 0,
-			"asinh": 0,
-			"atan": 0,
-			"atanh": 0,
-			"cos": 0,
-			"cosh": 0,
-			"cot": 0,
-			"csc": 0,
-			"exp": 0,
-			"ln": 0,
-			"log": 0,
-			"max": 0,
-			"min": 0,
-			"sec": 0,
-			"sin": 0,
-			"sinh": 0,
-			"tan": 0,
-			"tanh": 0,
-		}
-
-		def _negate(value Node) Node {
-			if value.kind == .NUMBER {
-				return value.withValue(-value.asDouble)
-			}
-			return Node.createUnary(.NEGATE, value)
+		def _negate(value Node, minusRange Range) Node {
+			return (value.kind == .NUMBER
+				? value.withNumber(-value.asNumber)
+				: Node.createUnary(.NEGATE, value).withInternalRange(minusRange)).withRange(Range.span(minusRange, value.range))
 		}
 
 		def _join(kind NodeKind, left Node, right Node) Node {

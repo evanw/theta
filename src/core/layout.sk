@@ -1233,7 +1233,7 @@ namespace Layout {
 						}
 						text += string.fromCodePoint((sibling as Character).codePoint)
 						var codePoint = SUBSTITUTIONS.get(text, INVALID_SUBSTITUTION)
-						var isFunction = codePoint == INVALID_SUBSTITUTION && text in Equation.Parser.FUNCTIONS
+						var isFunction = codePoint == INVALID_SUBSTITUTION && Functions.canonicalFunctionName(text) != null
 
 						# Prevent substitutions inside incomplete words
 						if codePoint == SKIP_SUBSTITUTION || isFunction {
