@@ -65,7 +65,11 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	}
 
 	def _createInitialContent {
-		_editor.insert(Layout.Element.deserializeFromString(_platform.route ?? INITIAL_CONTENT[(Math.random * INITIAL_CONTENT.count) as int]))
+		var route = _platform.route
+		if route == null || route == "" {
+			route = INITIAL_CONTENT[(Math.random * INITIAL_CONTENT.count) as int]
+		}
+		_editor.insert(Layout.Element.deserializeFromString(route))
 		_editor.resetHistory
 	}
 
@@ -470,7 +474,7 @@ namespace App {
 	@entry
 	def main {
 		var xhr = XMLHttpRequest.new
-		xhr.open("GET", "fonts.bin")
+		xhr.open("GET", "/fonts.bin")
 		xhr.onload = => {
 			var platform Platform
 
