@@ -358,11 +358,108 @@ namespace Layout {
 		def calculateSize(renderer Renderer, previous Element, parentFontSize double)
 		def updateLayout(x double, y double)
 		def render(renderer Renderer)
+		def serializeToString string
 	}
 
 	namespace Element {
 		const BASE_FONT_SIZE = 28.0
 		const MIN_FONT_SIZE = 16.0
+
+		def deserializeFromString(text string) Container {
+			var root = Container.new
+			var stack = [root]
+
+			# Recover characters and nesting
+			for i in 0..text.count {
+				var c = text[i]
+
+				if c == '(' || c == '[' {
+					var special = Special.new(c == '(' ? .PARENTHESES : .BRACKETS)
+					var contents = Container.new
+					special.children.append(contents)
+					stack.last.children.append(special)
+					stack.append(contents)
+				}
+
+				else if (c == ')' || c == ']') && stack.count != 1 {
+					stack.removeLast
+				}
+
+				else if Glyph.isWordCodePoint(c) || c >= '0' && c <= '9' || text.get(i) in ".<>≤≥=+-*/÷^_,!|" {
+					stack.last.children.append(Character.new(c))
+				}
+			}
+
+			_deserializeFinal(root)
+			return root
+		}
+
+		def _deserializeFinal(container Container) {
+			var children = container.children
+			Substitutions.apply(container, null)
+
+			# Handle nested containers first
+			for child in children {
+				if child is Special {
+					for contents in (child as Special).children {
+						_deserializeFinal(contents)
+					}
+				}
+			}
+
+			# Substitute or eliminate metacharacters
+			var i = 0
+			while i < children.count {
+				var child = children[i]
+
+				if child is Character {
+					var c = (child as Character).codePoint
+
+					if c == '^' || c == '_' {
+						var special = Special.new(c == '^' ? .OVER : .UNDER)
+						special.children.append(_extractContainer(children, i + 1))
+						children[i] = special
+					}
+
+					else if c == '/' {
+						var special = Special.new(.FRACTION)
+						var bottom = _extractContainer(children, i + 1)
+						var top = _extractContainer(children, i - 1)
+						special.children.append(top)
+						special.children.append(bottom)
+						children[i > 0 ? --i : i] = special
+					}
+				}
+
+				else {
+					assert(child is Special)
+					var special = child as Special
+					if special.kind == .ABSOLUTE_VALUE || special.kind == .CEIL || special.kind == .FLOOR || special.kind == .SQUARE_ROOT {
+						special.children[0] = _extractContainer(children, i + 1)
+					}
+				}
+
+				i++
+			}
+		}
+
+		def _extractContainer(children List<Element>, index int) Container {
+			if index >= 0 && index < children.count {
+				var child = children.takeAt(index)
+
+				# This should always be the case for valid strings
+				if child is Special && (child as Special).kind == .PARENTHESES {
+					return (child as Special).children.first
+				}
+
+				# Someone messed with the text, just use whatever's there instead
+				var container = Container.new
+				container.children.append(child)
+				return container
+			}
+
+			return Container.new
+		}
 	}
 
 	################################################################################
@@ -442,6 +539,10 @@ namespace Layout {
 
 		over render(renderer Renderer) {
 			renderer.addGlyph(glyph(renderer), box.x + paddingLeft, box.y, fontSize)
+		}
+
+		over serializeToString string {
+			return string.fromCodePoint(codePoint)
 		}
 
 		def glyph(renderer Renderer) Glyph {
@@ -581,6 +682,14 @@ namespace Layout {
 			}
 		}
 
+		over serializeToString string {
+			var text = ""
+			for child in children {
+				text += child.serializeToString
+			}
+			return text
+		}
+
 		def elementKindLeft(index int) ElementKind {
 			return index > 0 ? children[index - 1].elementKind : .OTHER
 		}
@@ -656,14 +765,13 @@ namespace Layout {
 		}
 
 		over anchorIndexFromPoint(x double, y double) int {
-			assert(!children.isEmpty)
+			assert(_validateChildCount)
 			var box = self.box
 			var first = children[0]
 			var firstBox = first.box
 
 			switch kind {
 				case .FRACTION {
-					assert(children.count == 2)
 					var second = children[1]
 					var child = y < second.box.y ? first : second
 					var childBox = child.box
@@ -675,7 +783,6 @@ namespace Layout {
 				}
 
 				case .OVER, .UNDER {
-					assert(children.count == 1)
 					return
 						x < box.x ? -1 :
 						x > box.x + box.width ? anchorCount :
@@ -683,7 +790,6 @@ namespace Layout {
 				}
 
 				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES, .SQUARE_ROOT {
-					assert(children.count == 1)
 					return
 						x < (box.x + firstBox.x) / 2 ? -1 :
 						x > (box.x + box.width + firstBox.x + firstBox.width) / 2 ? anchorCount :
@@ -696,7 +802,7 @@ namespace Layout {
 		}
 
 		over calculateSize(renderer Renderer, previous Element, parentFontSize double) {
-			assert(!children.isEmpty)
+			assert(_validateChildCount)
 			var first = children[0]
 
 			switch kind {
@@ -719,7 +825,6 @@ namespace Layout {
 
 			switch kind {
 				case .FRACTION {
-					assert(children.count == 2)
 					var second = children[1]
 
 					# Add space after functions
@@ -734,14 +839,12 @@ namespace Layout {
 				}
 
 				case .OVER {
-					assert(children.count == 1)
 					box.width = first.box.width
 					box.upperHeight = (previous != null ? Math.max(0, previous.box.upperHeight - parentFontSize * Character.UPPER_FONT_RATIO) : 0) + first.box.height
 					box.lowerHeight = 0
 				}
 
 				case .UNDER {
-					assert(children.count == 1)
 					box.width = first.box.width
 					box.upperHeight = 0
 					box.lowerHeight = (previous != null ? Math.max(0, previous.box.lowerHeight - parentFontSize * Character.LOWER_FONT_RATIO) : 0) + first.box.height
@@ -768,7 +871,7 @@ namespace Layout {
 		}
 
 		over updateLayout(x double, y double) {
-			assert(!children.isEmpty)
+			assert(_validateChildCount)
 			var first = children[0]
 
 			box.x = x
@@ -782,22 +885,18 @@ namespace Layout {
 				}
 
 				case .OVER {
-					assert(children.count == 1)
 					first.updateLayout(x, y)
 				}
 
 				case .UNDER {
-					assert(children.count == 1)
 					first.updateLayout(x, y + box.height - first.box.height)
 				}
 
 				case .SQUARE_ROOT {
-					assert(children.count == 1)
 					first.updateLayout(x + 0.55 * fontSize + paddingLeft, y + box.height - first.box.height)
 				}
 
 				case .ABSOLUTE_VALUE, .BRACKETS, .CEIL, .FLOOR, .PARENTHESES {
-					assert(children.count == 1)
 					first.updateLayout(x + (box.width - first.box.width) / 2, y)
 				}
 			}
@@ -901,6 +1000,56 @@ namespace Layout {
 				}
 			}
 		}
+
+		over serializeToString string {
+			assert(_validateChildCount)
+			var first = children[0]
+
+			switch kind {
+				case .ABSOLUTE_VALUE {
+					return "abs(" + first.serializeToString + ")"
+				}
+
+				case .BRACKETS {
+					return "[" + first.serializeToString + "]"
+				}
+
+				case .CEIL {
+					return "ceil(" + first.serializeToString + ")"
+				}
+
+				case .FLOOR {
+					return "floor(" + first.serializeToString + ")"
+				}
+
+				case .FRACTION {
+					return "(" + first.serializeToString + ")/(" + children[1].serializeToString + ")"
+				}
+
+				case .OVER {
+					return "^(" + first.serializeToString + ")"
+				}
+
+				case .PARENTHESES {
+					return "(" + first.serializeToString + ")"
+				}
+
+				case .SQUARE_ROOT {
+					return "sqrt(" + first.serializeToString + ")"
+				}
+
+				case .UNDER {
+					return "_(" + first.serializeToString + ")"
+				}
+			}
+
+			assert(false)
+			return ""
+		}
+
+		def _validateChildCount bool {
+			return children.count == (kind == .FRACTION ? 2 : 1)
+		}
 	}
 
 	namespace Special {
@@ -935,7 +1084,6 @@ namespace Layout {
 		var _delegate Delegate = null
 		var _history List<HistoryState> = []
 		var _historyIndex = 0
-		var _generatedFunctionID = Character.INVALID_FUNCTION_ID
 
 		def new(renderer Renderer, originX int, originY int) {
 			_renderer = renderer
@@ -1013,7 +1161,7 @@ namespace Layout {
 			var container = copy
 			if !container.children.isEmpty {
 				_selection.delete
-				_applySubstitutions(_root, 0)
+				_applySubstitutions
 				_commitAfterChange
 			}
 			return container
@@ -1146,7 +1294,7 @@ namespace Layout {
 					_insert(insertAfterwards, directionAfterwards)
 				}
 
-				_applySubstitutions(_root, 0)
+				_applySubstitutions
 				_commitAfterChange
 			}
 
@@ -1161,7 +1309,7 @@ namespace Layout {
 			if !container.children.isEmpty {
 				_selection.delete
 				_insert(container.containerClone, .RIGHT)
-				_applySubstitutions(_root, 0)
+				_applySubstitutions
 				_commitAfterChange
 			}
 		}
@@ -1207,101 +1355,12 @@ namespace Layout {
 			_notifyDelegateOfChange(.CONTENTS)
 		}
 
-		def _applySubstitutions(container Container, indexBase int) {
-			var children = container.children
-			var childIndexBase = indexBase
-			var skipCount = 0
-			var i = 0
-
-			# Reset the counter before each round of substitutions
-			if indexBase == 0 {
-				_generatedFunctionID = Character.INVALID_FUNCTION_ID
-			}
-
-			# Move over all children, mutating the sequence with character substitutions
-			while i < children.count {
-				var child = children[i]
-
-				# Character elements
-				if child is Character && --skipCount < 0 {
-					(child as Character).functionID = Character.INVALID_FUNCTION_ID
-					var text = ""
-					for j in i..children.count {
-						var sibling = children[j]
-						if !(sibling is Character) {
-							break
-						}
-						text += string.fromCodePoint((sibling as Character).codePoint)
-						var codePoint = SUBSTITUTIONS.get(text, INVALID_SUBSTITUTION)
-						var isFunction = codePoint == INVALID_SUBSTITUTION && Functions.canonicalFunctionName(text) != null
-
-						# Prevent substitutions inside incomplete words
-						if codePoint == SKIP_SUBSTITUTION || isFunction {
-							skipCount = j - i
-
-							# Mark characters that are part of a function
-							if isFunction {
-								_generatedFunctionID++
-								for k in i..j + 1 {
-									assert(children[k] is Character)
-									(children[k] as Character).functionID = _generatedFunctionID
-								}
-							}
-						}
-
-						# Substitute matching characters
-						else if codePoint != INVALID_SUBSTITUTION {
-							children.removeRange(i, j + 1)
-
-							# Special substitutions
-							if codePoint < 0 {
-								child = Special.new(
-									codePoint == ABSOLUTE_VALUE_SUBSTITUTION ? .ABSOLUTE_VALUE :
-									codePoint == CEIL_SUBSTITUTION ? .CEIL :
-									codePoint == FLOOR_SUBSTITUTION ? .FLOOR :
-									codePoint == SQUARE_ROOT_SUBSTITUTION ? .SQUARE_ROOT :
-									.PARENTHESES)
-								(child as Special).children.append(Container.new)
-							}
-
-							# Normal characters
-							else {
-								child = Character.new(codePoint)
-							}
-
-							children.insert(i, child)
-							var start = _selection.start.relativeIndex - childIndexBase
-							var end = _selection.end.relativeIndex - childIndexBase
-							if start > 0 {
-								start = Math.max(1, start + i - j)
-							}
-							if end > 0 {
-								end = Math.max(1, end + i - j)
-							}
-							_selection.changeAnchors(_root.anchorAt(childIndexBase + start), _root.anchorAt(childIndexBase + end))
-							skipCount = 0
-							break
-						}
-					}
-				}
-
-				# Special elements
-				else if child is Special {
-					var nestedIndexBase = childIndexBase + 1
-					for nested in (child as Special).children {
-						_applySubstitutions(nested, nestedIndexBase)
-						nestedIndexBase += nested.anchorCount
-					}
-				}
-
-				# Move to the next child
-				childIndexBase += 1 + child.anchorCount
-				i++
-			}
+		def _applySubstitutions {
+			Substitutions.apply(_root, _selection)
 		}
 	}
 
-	namespace Editor {
+	namespace Substitutions {
 		const INVALID_SUBSTITUTION = 0
 		const SKIP_SUBSTITUTION = -1
 		const ABSOLUTE_VALUE_SUBSTITUTION = -2
@@ -1369,6 +1428,109 @@ namespace Layout {
 			"ceil": CEIL_SUBSTITUTION,
 			"floor": FLOOR_SUBSTITUTION,
 			"sqrt": SQUARE_ROOT_SUBSTITUTION,
+		}
+		var _generatedFunctionID = Character.INVALID_FUNCTION_ID
+
+		def apply(root Container, selection Range) {
+			_apply(root, 0, selection, root)
+		}
+
+		def _apply(container Container, indexBase int, selection Range, root Container) {
+			var children = container.children
+			var childIndexBase = indexBase
+			var skipCount = 0
+			var i = 0
+
+			# Reset the counter before each round of substitutions
+			if indexBase == 0 {
+				_generatedFunctionID = Character.INVALID_FUNCTION_ID
+			}
+
+			# Move over all children, mutating the sequence with character substitutions
+			while i < children.count {
+				var child = children[i]
+
+				# Character elements
+				if child is Character && --skipCount < 0 {
+					(child as Character).functionID = Character.INVALID_FUNCTION_ID
+					var text = ""
+					for j in i..children.count {
+						var sibling = children[j]
+						if !(sibling is Character) {
+							break
+						}
+						text += string.fromCodePoint((sibling as Character).codePoint)
+						var codePoint = SUBSTITUTIONS.get(text, INVALID_SUBSTITUTION)
+						var isFunction = codePoint == INVALID_SUBSTITUTION && Functions.canonicalFunctionName(text) != null
+
+						# Prevent substitutions inside incomplete words
+						if codePoint == SKIP_SUBSTITUTION || isFunction {
+							skipCount = j - i
+
+							# Mark characters that are part of a function
+							if isFunction {
+								_generatedFunctionID++
+								for k in i..j + 1 {
+									assert(children[k] is Character)
+									(children[k] as Character).functionID = _generatedFunctionID
+								}
+							}
+						}
+
+						# Substitute matching characters
+						else if codePoint != INVALID_SUBSTITUTION {
+							children.removeRange(i, j + 1)
+
+							# Special substitutions
+							if codePoint < 0 {
+								child = Special.new(
+									codePoint == ABSOLUTE_VALUE_SUBSTITUTION ? .ABSOLUTE_VALUE :
+									codePoint == CEIL_SUBSTITUTION ? .CEIL :
+									codePoint == FLOOR_SUBSTITUTION ? .FLOOR :
+									codePoint == SQUARE_ROOT_SUBSTITUTION ? .SQUARE_ROOT :
+									.PARENTHESES)
+								(child as Special).children.append(Container.new)
+							}
+
+							# Normal characters
+							else {
+								child = Character.new(codePoint)
+							}
+
+							children.insert(i, child)
+
+							# If provided, update the selection range to reflect the substitution
+							if selection != null {
+								var start = selection.start.relativeIndex - childIndexBase
+								var end = selection.end.relativeIndex - childIndexBase
+								if start > 0 {
+									start = Math.max(1, start + i - j)
+								}
+								if end > 0 {
+									end = Math.max(1, end + i - j)
+								}
+								selection.changeAnchors(root.anchorAt(childIndexBase + start), root.anchorAt(childIndexBase + end))
+							}
+
+							skipCount = 0
+							break
+						}
+					}
+				}
+
+				# Special elements
+				else if child is Special {
+					var nestedIndexBase = childIndexBase + 1
+					for nested in (child as Special).children {
+						_apply(nested, nestedIndexBase, selection, root)
+						nestedIndexBase += nested.anchorCount
+					}
+				}
+
+				# Move to the next child
+				childIndexBase += 1 + child.anchorCount
+				i++
+			}
 		}
 	}
 }
