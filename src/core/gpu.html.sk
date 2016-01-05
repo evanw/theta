@@ -37,7 +37,7 @@ if TARGET == .JAVASCRIPT {
 				})
 
 				if _gl == null {
-					throw Error.new("Could not initialize WebGL")
+					throw SetupError.new
 				}
 
 				var canvas = _gl.canvas

@@ -88,4 +88,5 @@ interface Platform {
 	def parseNumber(text string) double
 	def setRoute(text string)
 	def route string
+	def fetchResource(name string, callback fn(Uint8Array))
 }

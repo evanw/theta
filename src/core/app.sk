@@ -473,26 +473,11 @@ namespace App {
 
 	@entry
 	def main {
-		var xhr = XMLHttpRequest.new
-		xhr.open("GET", "/fonts.bin")
-		xhr.onload = => {
-			var platform Platform
-
-			try {
-				platform = HTMLPlatform.new
-			}
-
-			catch e dynamic {
-				if e && e.message == "Could not initialize WebGL" {
-					document.write("This application requires WebGL.")
-					return
-				}
-				throw e
-			}
-
-			new(platform, DataArray.new(Uint8Array.new(xhr.response)))
+		var platform = HTMLPlatform.new
+		if platform.context == null {
+			document.write("This application requires WebGL.")
+		} else {
+			platform.fetchResource("fonts.bin", bytes => new(platform, DataArray.new(bytes)))
 		}
-		xhr.responseType = "arraybuffer"
-		xhr.send
 	}
 }

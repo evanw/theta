@@ -5,13 +5,18 @@ class HTMLPlatform :: Platform {
 	var _density = 0.0
 	var _pixelWidth = 0
 	var _pixelHeight = 0
-	var _context = GPU.HTMLContext.new
+	var _context GPU.HTMLContext = null
 	var _delegate Platform.Delegate = null
 	var _hasFocus = true
 
 	def new {
+		try {
+			_context = GPU.HTMLContext.new
+		} catch e GPU.SetupError {
+		}
+
 		var undefined = dynamic.void(0)
-		var canvas = _context.gl.canvas
+		var canvas = _context?.gl.canvas
 		var centroid = Vector.new
 		var isHidden = false
 		var isBlurred = false
@@ -36,7 +41,7 @@ class HTMLPlatform :: Platform {
 				_density = density
 				_pixelWidth = Math.round(width * density) as int
 				_pixelHeight = Math.round(height * density) as int
-				_context.resize(_pixelWidth, _pixelHeight, width, height)
+				_context?.resize(_pixelWidth, _pixelHeight, width, height)
 
 				if _delegate != null {
 					_delegate.handleResize
@@ -117,118 +122,120 @@ class HTMLPlatform :: Platform {
 			shortcutMap[_shortcut('K', .CONTROL)] = .DELETE_RIGHT_LINE
 		}
 
-		# The wheel event on OS X is nice and simple
-		if isOSX {
-			canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
-				# Chrome, Safari, and Firefox on OS X for a trackpad: +/- 1 pixel (or a real mouse disguised as a trackpad by Chrome and Safari, no way to know for sure)
-				if e.deltaMode == e.DOM_DELTA_PIXEL {
-					if e.ctrlKey || e.metaKey {
-						_delegate.handlePinch(e.pageX, e.pageY, e.deltaY) # Chrome-only pinch zoom support
-					} else {
-						_delegate.handleScroll(e.deltaX, e.deltaY) # Two-finger scrolling to pan around
+		if canvas != null {
+			# The wheel event on OS X is nice and simple
+			if isOSX {
+				canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
+					# Chrome, Safari, and Firefox on OS X for a trackpad: +/- 1 pixel (or a real mouse disguised as a trackpad by Chrome and Safari, no way to know for sure)
+					if e.deltaMode == e.DOM_DELTA_PIXEL {
+						if e.ctrlKey || e.metaKey {
+							_delegate.handlePinch(e.pageX, e.pageY, e.deltaY) # Chrome-only pinch zoom support
+						} else {
+							_delegate.handleScroll(e.deltaX, e.deltaY) # Two-finger scrolling to pan around
+						}
+						e.preventDefault
 					}
-					e.preventDefault
+
+					# Firefox on OS X for a real mouse: +/- 1 lines (not actual notches due to accelerated scrolling)
+					else {
+						_handleNotchedPinch(e, e.deltaY)
+					}
+				})
+			}
+
+			# The wheel event on Windows is a disaster
+			else {
+				# IE returns random crap for "e.deltaY" in the "wheel" event. For example,
+				# I get 59.099998474121094 for a maximized window with Developer Tools open.
+				# I have no idea what the relationship is between these values and wheel
+				# notches but it's definitely non-linear. Anyway, the "mousewheel" event
+				# seems to report +/- 120 reliably, so use that instead.
+				if isIE {
+					canvas.addEventListener("mousewheel", (e HTMLMouseWheelEvent) => {
+						_handleNotchedPinch(e, -e.wheelDelta / 120)
+					})
 				}
 
-				# Firefox on OS X for a real mouse: +/- 1 lines (not actual notches due to accelerated scrolling)
+				# Firefox on Windows: +/- 3 lines
+				# Chrome on Windows: +/- 100 pixels
 				else {
-					_handleNotchedPinch(e, e.deltaY)
+					canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
+						_handleNotchedPinch(e, e.deltaY / (e.deltaMode == e.DOM_DELTA_LINE ? 3 : 100))
+					})
+				}
+			}
+
+			canvas.addEventListener("touchstart", (e HTMLTouchEvent) => {
+				e.preventDefault
+
+				if _delegate != null {
+					var touches = e.touches
+					_computeCentroid(touches, centroid)
+					_delegate.handleTouchStart(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
+				}
+			})
+
+			canvas.addEventListener("touchmove", (e HTMLTouchEvent) => {
+				if _delegate != null {
+					var touches = e.touches
+					_computeCentroid(touches, centroid)
+					_delegate.handleTouchMove(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
+				}
+			})
+
+			canvas.addEventListener("touchend", (e HTMLTouchEvent) => {
+				if _delegate != null {
+					var touches = e.touches
+					_computeCentroid(touches, centroid)
+					_delegate.handleTouchEnd(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
+				}
+			})
+
+			canvas.addEventListener("mousedown", (e HTMLMouseEvent) => {
+				e.preventDefault
+
+				if _delegate != null {
+					var button = e.button
+					if e.buttons != undefined {
+						buttons = _buttonsFromMouseEvent(e)
+					} else {
+						# Safari is lame
+						buttons |=
+							button == 0 ? .LEFT :
+							button == 1 ? .MIDDLE :
+							button == 2 ? .RIGHT :
+							0
+					}
+					_delegate.handleMouseDown(e.pageX, e.pageY, buttons)
+				}
+			})
+
+			canvas.addEventListener("mousemove", (e HTMLMouseEvent) => {
+				if _delegate != null {
+					if e.buttons != undefined {
+						buttons = _buttonsFromMouseEvent(e)
+					}
+					_delegate.handleMouseMove(e.pageX, e.pageY, buttons)
+				}
+			})
+
+			canvas.addEventListener("mouseup", (e HTMLMouseEvent) => {
+				if _delegate != null {
+					var button = e.button
+					if e.buttons != undefined {
+						buttons = _buttonsFromMouseEvent(e)
+					} else {
+						# Safari is lame
+						buttons &=
+							button == 0 ? ~.LEFT :
+							button == 1 ? ~.MIDDLE :
+							button == 2 ? ~.RIGHT :
+							~0
+					}
+					_delegate.handleMouseUp(e.pageX, e.pageY, buttons)
 				}
 			})
 		}
-
-		# The wheel event on Windows is a disaster
-		else {
-			# IE returns random crap for "e.deltaY" in the "wheel" event. For example,
-			# I get 59.099998474121094 for a maximized window with Developer Tools open.
-			# I have no idea what the relationship is between these values and wheel
-			# notches but it's definitely non-linear. Anyway, the "mousewheel" event
-			# seems to report +/- 120 reliably, so use that instead.
-			if isIE {
-				canvas.addEventListener("mousewheel", (e HTMLMouseWheelEvent) => {
-					_handleNotchedPinch(e, -e.wheelDelta / 120)
-				})
-			}
-
-			# Firefox on Windows: +/- 3 lines
-			# Chrome on Windows: +/- 100 pixels
-			else {
-				canvas.addEventListener("wheel", (e HTMLWheelEvent) => {
-					_handleNotchedPinch(e, e.deltaY / (e.deltaMode == e.DOM_DELTA_LINE ? 3 : 100))
-				})
-			}
-		}
-
-		canvas.addEventListener("touchstart", (e HTMLTouchEvent) => {
-			e.preventDefault
-
-			if _delegate != null {
-				var touches = e.touches
-				_computeCentroid(touches, centroid)
-				_delegate.handleTouchStart(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
-			}
-		})
-
-		canvas.addEventListener("touchmove", (e HTMLTouchEvent) => {
-			if _delegate != null {
-				var touches = e.touches
-				_computeCentroid(touches, centroid)
-				_delegate.handleTouchMove(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
-			}
-		})
-
-		canvas.addEventListener("touchend", (e HTMLTouchEvent) => {
-			if _delegate != null {
-				var touches = e.touches
-				_computeCentroid(touches, centroid)
-				_delegate.handleTouchEnd(centroid.x, centroid.y, _computeDistance(touches, centroid), touches.count)
-			}
-		})
-
-		canvas.addEventListener("mousedown", (e HTMLMouseEvent) => {
-			e.preventDefault
-
-			if _delegate != null {
-				var button = e.button
-				if e.buttons != undefined {
-					buttons = _buttonsFromMouseEvent(e)
-				} else {
-					# Safari is lame
-					buttons |=
-						button == 0 ? .LEFT :
-						button == 1 ? .MIDDLE :
-						button == 2 ? .RIGHT :
-						0
-				}
-				_delegate.handleMouseDown(e.pageX, e.pageY, buttons)
-			}
-		})
-
-		canvas.addEventListener("mousemove", (e HTMLMouseEvent) => {
-			if _delegate != null {
-				if e.buttons != undefined {
-					buttons = _buttonsFromMouseEvent(e)
-				}
-				_delegate.handleMouseMove(e.pageX, e.pageY, buttons)
-			}
-		})
-
-		canvas.addEventListener("mouseup", (e HTMLMouseEvent) => {
-			if _delegate != null {
-				var button = e.button
-				if e.buttons != undefined {
-					buttons = _buttonsFromMouseEvent(e)
-				} else {
-					# Safari is lame
-					buttons &=
-						button == 0 ? ~.LEFT :
-						button == 1 ? ~.MIDDLE :
-						button == 2 ? ~.RIGHT :
-						~0
-				}
-				_delegate.handleMouseUp(e.pageX, e.pageY, buttons)
-			}
-		})
 
 		document.addEventListener("keydown", (e HTMLKeyboardEvent) => {
 			var key = _shortcut(e.which,
@@ -272,11 +279,15 @@ class HTMLPlatform :: Platform {
 			handleFocusChange()
 		})
 
-		_context.gl.getExtension("OES_standard_derivatives")
 		window.addEventListener("resize", resize)
-		document.body.appendChild(canvas)
 		resize()
 		tick()
+
+		if _context != null {
+			_context.gl.getExtension("OES_standard_derivatives")
+			_context.clear(.WHITE)
+			document.body.appendChild(canvas)
+		}
 	}
 
 	def os Platform.OS {
@@ -331,12 +342,22 @@ class HTMLPlatform :: Platform {
 	}
 
 	def setRoute(text string) {
-		history.replaceState(null, "", encodeURI(URL_PREFIX + text))
+		if route != null {
+			history.replaceState(null, "", encodeURI(URL_PREFIX + text))
+		}
 	}
 
 	def route string {
 		var path string = location.pathname
-		return path.startsWith(URL_PREFIX) ? decodeURI(path.slice(URL_PREFIX.count)) : null
+		return path == "/" ? "" : path.startsWith(URL_PREFIX) ? decodeURI(path.slice(URL_PREFIX.count)) : null
+	}
+
+	def fetchResource(name string, callback fn(Uint8Array)) {
+		var xhr = XMLHttpRequest.new
+		xhr.open("GET", route != null ? "/" + name : name)
+		xhr.onload = => callback(Uint8Array.new(xhr.response))
+		xhr.responseType = "arraybuffer"
+		xhr.send
 	}
 
 	def _computeCentroid(touches List<HTMLTouch>, centroid Vector) {

@@ -22,6 +22,9 @@ namespace GPU {
 		TRIANGLE_STRIP
 	}
 
+	class SetupError {
+	}
+
 	interface Context {
 		def addContextResetHandler(callback fn())
 		def beginFrame
