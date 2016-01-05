@@ -20,6 +20,8 @@ enum App.MouseAction {
 
 class App :: Platform.Delegate, Layout.Editor.Delegate {
 	var _platform Platform
+	var _oldPlatformWidth = 0.0
+	var _oldPlatformHeight = 0.0
 	var _canvas Canvas
 	var _editor Layout.Editor
 	var _fps = 60.0
@@ -61,6 +63,7 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_resetCursorBlink
 		platform.setDelegate(self)
 		_editor.setDelegate(self)
+		handleResize
 		_draw
 	}
 
@@ -144,6 +147,9 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 	}
 
 	def handleResize {
+		_canvas.translateOrigin((_platform.width - _oldPlatformWidth) / 2, (_platform.height - _oldPlatformHeight) / 2)
+		_oldPlatformWidth = _platform.width
+		_oldPlatformHeight = _platform.height
 		_stopAnimation
 		_draw
 	}

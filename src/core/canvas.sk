@@ -43,8 +43,6 @@ class Canvas :: Layout.Renderer {
 		_screenQuad = _pool.allocate(SCREEN_QUAD_FORMAT, DataArray.new.appendFloats([-1, -1, 1, -1, -1, 1, 1, 1]).bytes)
 		_color = _context.createTexture(.NEAREST_CLAMP, 0, 0)
 		_target = _context.createRenderTarget(_color)
-		_origin.x = _platform.width / 2
-		_origin.y = _platform.height / 2
 	}
 
 	def originX double {
