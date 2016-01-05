@@ -349,7 +349,7 @@ class Canvas :: Layout.Renderer {
 
 		# Composite the offscreen render target back onto the canvas using the non-zero winding rule
 		_context.setRenderTarget(null)
-		_context.setBlendState(.ZERO, .INVERSE_SOURCE_COLOR)
+		_context.setBlendState(.ZERO, .SOURCE_COLOR)
 		_textMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
 		_textMaterial.setUniformVec4(GLSLX_NAME_COLOR, 1, 1, 1, 1)
 		_textMaterial.setUniformVec4(GLSLX_NAME_RECT,
