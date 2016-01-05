@@ -63,11 +63,14 @@ export void textFragment() {
 	vec3 alphaR = min(abs(upperR - lowerR), 2.0);
 
 	// Average the energy over the pixels on either side
-	gl_FragColor = 1.0 - color * vec4(
+	vec4 rgba = vec4(
 		(alphaR.x + alphaR.y + alphaR.z) / 6.0,
 		(alphaL.y + alphaR.x + alphaR.y) / 6.0,
 		(alphaL.x + alphaL.y + alphaR.x) / 6.0,
 		0.0);
+
+	// Optionally scale by a color
+	gl_FragColor = color.a == 0.0 ? 1.0 - rgba : color * rgba;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

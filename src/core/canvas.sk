@@ -349,7 +349,7 @@ class Canvas :: Layout.Renderer {
 		_context.setRenderTarget(null)
 		_context.setBlendState(.ZERO, .SOURCE_COLOR)
 		_textMaterial.setUniformSampler(GLSLX_NAME_TEXTURE, _color, 0)
-		_textMaterial.setUniformVec4(GLSLX_NAME_COLOR, 1, 1, 1, 1)
+		_textMaterial.setUniformVec4(GLSLX_NAME_COLOR, .TRANSPARENT)
 		_textMaterial.setUniformVec4(GLSLX_NAME_RECT,
 			Math.floor(_instanceBounds.minX) / _platform.width,
 			1 - Math.ceil(_instanceBounds.maxY) / _platform.height,
