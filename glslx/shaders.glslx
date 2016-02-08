@@ -87,14 +87,14 @@ export void equationFragment() {
 	float y = _coord2.y;
 	float dx = dFdx(x);
 	float dy = dFdy(y);
-	float z = eq(x,y);
+	float z = eq(x, y);
 
 	// Evaluate all 4 adjacent +/- neighbor pixels
 	vec2 z_neg = vec2(eq(x - dx, y), eq(x, y - dy));
 	vec2 z_pos = vec2(eq(x + dx, y), eq(x, y + dy));
 
 	// Compute the x and y slopes
-	vec2 slope = (z_pos-z_neg) * 0.5;
+	vec2 slope = (z_pos - z_neg) * 0.5;
 
 	// Compute the gradient (the shortest point on the curve is assumed to lie in this direction)
 	vec2 gradient = normalize(slope);
