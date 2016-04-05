@@ -1368,6 +1368,8 @@ namespace Layout {
 		const FLOOR_SUBSTITUTION = -4
 		const SQUARE_ROOT_SUBSTITUTION = -5
 		const SUBSTITUTIONS = {
+			"<=": '≤',
+			">=": '≥',
 			"Alpha": 'Α',
 			"alpha": 'α',
 			"Beta": 'Β',
