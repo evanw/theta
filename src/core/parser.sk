@@ -413,6 +413,7 @@ namespace Equation {
 					var text = ""
 					var match string = null
 					var matchCount = 0
+					var flags TokenFlags = 0
 
 					for j in i..tokens.count {
 						var other = tokens[j]
@@ -426,6 +427,7 @@ namespace Equation {
 						# Always match at least a single character word
 						var canonical = Functions.canonicalFunctionName(text)
 						if matchCount == 0 || canonical != null {
+							if canonical != null { flags = .IS_FUNCTION }
 							match = canonical ?? text
 							matchCount = j - i + 1
 						}
@@ -433,7 +435,7 @@ namespace Equation {
 
 					if matchCount != 0 {
 						var range = Range.span(token.range, tokens[i + matchCount - 1].range)
-						token = Token.new(.OPERAND, range, 0, Node.createSymbol(match).withRange(range), matchCount != 1 ? .IS_FUNCTION : 0)
+						token = Token.new(.OPERAND, range, 0, Node.createSymbol(match).withRange(range), flags)
 						tokens.removeRange(i, i + matchCount)
 						tokens.insert(i, token)
 					}

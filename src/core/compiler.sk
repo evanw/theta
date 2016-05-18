@@ -19,6 +19,15 @@ namespace Equation {
 					"}"
 			}
 
+			if "gamma" in _functions {
+				functions +=
+					"float gamma(float x){" +
+						"float a=x<0.?1.-x:x,b=a+5.5,c=exp((a+.5)*log(b)-b+log(2.5066282*(1.+76.18009/(a+1.)-86.50532" +
+							"/(a+2.)+24.0141/(a+3.)-1.2317395/(a+4.)+.001208651/(a+5.)-.53952394e-5/(a+6.))/a));" +
+						"return x<0.?\(Math.PI)/(c*sin(\(Math.PI)*x)):c;" +
+					"}"
+			}
+
 			################################################################################
 			# Trigonometric
 
@@ -162,6 +171,11 @@ namespace Equation {
 					return "pow(" + _compile(node.binaryLeft) + "," + _compile(node.binaryRight) + ")"
 				}
 
+				case .FACTORIAL {
+					_functions["gamma"] = 0
+					return "gamma((" + _compile(node.unaryValue) + ")+1.)"
+				}
+
 				case .ADD, .MULTIPLY {
 					var text = node.hasChildren ? "" : node.kind == .ADD ? "0." : "1."
 					for child = node.firstChild; child != null; child = child.nextSibling {
@@ -207,6 +221,7 @@ namespace Equation {
 			"e" : "2.718281828459045",
 			"ln" : "log",
 			"log" : "log10",
+			"Γ" : "gamma",
 			"θ" : "theta",
 			"π" : "3.141592653589793",
 		}

@@ -67,6 +67,7 @@ namespace Functions {
 				"sqrt": t1,
 				"tan": t1,
 				"tanh": t1,
+				"Γ" : t1,
 
 				# 1 or 2 arguments
 				"atan": t12,
