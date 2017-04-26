@@ -64,13 +64,13 @@ namespace GPU {
 						}
 
 						# Fit each area as tightly as possible against the previous one
-						byteOffset = _alignToNextMultiple(byteOffset, stride)
+						byteOffset = _alignToNextMultiple(byteOffset, area.stride)
 						if area.byteOffset != byteOffset {
 							buffer.move(area.byteOffset, byteOffset, area.byteCount)
 							area.wasMovedTo(byteOffset)
-							byteOffset += area.byteCount
 						}
 
+						byteOffset += area.byteCount
 						return false
 					})
 
