@@ -220,7 +220,7 @@ class HTMLPlatform :: Platform {
 				}
 			})
 
-			canvas.addEventListener("mousemove", (e HTMLMouseEvent) => {
+			document.addEventListener("mousemove", (e HTMLMouseEvent) => {
 				if _delegate != null {
 					if e.buttons != undefined {
 						buttons = _buttonsFromMouseEvent(e)
@@ -229,7 +229,7 @@ class HTMLPlatform :: Platform {
 				}
 			})
 
-			canvas.addEventListener("mouseup", (e HTMLMouseEvent) => {
+			document.addEventListener("mouseup", (e HTMLMouseEvent) => {
 				if _delegate != null {
 					var button = e.button
 					if e.buttons != undefined {
