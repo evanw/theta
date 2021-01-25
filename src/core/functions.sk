@@ -40,6 +40,7 @@ namespace Functions {
 			var t1 = FunctionType.new(1, 1)
 			var t12 = FunctionType.new(1, 2)
 			var t2n = FunctionType.new(2, -1)
+			var t3 = FunctionType.new(3, 3)
 
 			_table = {
 				# 1 argument
@@ -59,9 +60,11 @@ namespace Functions {
 				"csc": t1,
 				"exp": t1,
 				"floor": t1,
+				"fract" : t1,
 				"ln": t1,
 				"log": t1,
 				"sec": t1,
+				"sign": t1,
 				"sin": t1,
 				"sinh": t1,
 				"sqrt": t1,
@@ -72,9 +75,14 @@ namespace Functions {
 				# 1 or 2 arguments
 				"atan": t12,
 
-				# Unlimited arguments
+				# 2+ arguments
 				"max": t2n,
 				"min": t2n,
+
+				# 3 arguments
+				"clamp": t3,
+				"mix": t3,
+				"smoothstep": t3,
 			}
 		}
 
