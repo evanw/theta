@@ -87,7 +87,7 @@ class Canvas :: Layout.Renderer {
 		_context.beginFrame
 		_context.setViewport(0, 0, _platform.pixelWidth, _platform.pixelHeight)
 		_context.setCopyBlendState
-		_context.clear(.WHITE)
+		_context.clear(CLEAR_COLOR)
 	}
 
 	def endFrame {
@@ -153,7 +153,7 @@ class Canvas :: Layout.Renderer {
 				Vector.new(x1, y - 1),
 				Vector.new(x1 + 3, y + 3),
 				Vector.new(x1 - 3, y + 3),
-			], .RED)
+			], ERROR_COLOR)
 		}
 
 		# Squiggle
@@ -164,7 +164,7 @@ class Canvas :: Layout.Renderer {
 				line.append(Vector.new(x, y + zigzag))
 				zigzag = -zigzag
 			}
-			_smooth.strokeNonOverlappingPolyline(line, .RED, 1, .OPEN)
+			_smooth.strokeNonOverlappingPolyline(line, ERROR_COLOR, 1, .OPEN)
 		}
 	}
 
@@ -217,13 +217,13 @@ class Canvas :: Layout.Renderer {
 		# Horizontal axis
 		for x in left..right {
 			var tx = origin.x + x * scale / step
-			_smooth.strokeLineWithoutEndpointAA(tx, 0, tx, height, x == 0 ? .BLACK : x % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, x == 0 ? 2 : 1)
+			_smooth.strokeLineWithoutEndpointAA(tx, 0, tx, height, x == 0 ? GRID_SOLID_COLOR : x % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, x == 0 ? 2 : 1)
 		}
 
 		# Vertical axis
 		for y in top..bottom {
 			var ty = origin.y - y * scale / step
-			_smooth.strokeLineWithoutEndpointAA(0, ty, width, ty, y == 0 ? .BLACK : y % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, y == 0 ? 2 : 1)
+			_smooth.strokeLineWithoutEndpointAA(0, ty, width, ty, y == 0 ? GRID_SOLID_COLOR : y % 10 == 0 ? GRID_DARK_COLOR : GRID_LIGHT_COLOR, y == 0 ? 2 : 1)
 		}
 
 		# Coordinate text and tick marks
@@ -245,7 +245,7 @@ class Canvas :: Layout.Renderer {
 		for x in textLeft..textRight {
 			var tx = origin.x + x * scale / textStep
 			if x != 0 {
-				_smooth.strokeLine(tx, origin.y - GRID_TICK_SIZE, tx, origin.y + GRID_TICK_SIZE, .BLACK, 2)
+				_smooth.strokeLine(tx, origin.y - GRID_TICK_SIZE, tx, origin.y + GRID_TICK_SIZE, GRID_SOLID_COLOR, 2)
 			}
 			addText(_formatNumber(x / textStep), tx + GRID_FONT_SIZE * 0.3, textY + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE, .PREFER_NORMAL)
 		}
@@ -256,7 +256,7 @@ class Canvas :: Layout.Renderer {
 			if y != 0 {
 				var text = _formatNumber(y / textStep)
 				var ty = origin.y - y * scale / textStep
-				_smooth.strokeLine(origin.x - GRID_TICK_SIZE, ty, origin.x + GRID_TICK_SIZE, ty, .BLACK, 2)
+				_smooth.strokeLine(origin.x - GRID_TICK_SIZE, ty, origin.x + GRID_TICK_SIZE, ty, GRID_SOLID_COLOR, 2)
 				addText(text, Math.min(textX, width - _computeTextWidth(text, GRID_FONT_SIZE, .PREFER_NORMAL) - GRID_FONT_SIZE * 0.3),
 					ty + GRID_FONT_SIZE * 0.1, GRID_FONT_SIZE, .PREFER_NORMAL)
 			}
@@ -301,10 +301,11 @@ class Canvas :: Layout.Renderer {
 			_transformA.scale(_platform.width * 0.5, -_platform.height * 0.5)
 			_transformA.translate(1, -1)
 
+			var color = EQUATION_COLOR
 			_equationMaterial.setUniformFloat(GLSLX_NAME_THICKNESS_AND_MODE,
 				_compiler.hideCurve ? 0 : (_compiler.shadeAreaUnderCurve ? -2 : 2) * _platform.density)
 			_equationMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformA)
-			_equationMaterial.setUniformVec4(GLSLX_NAME_COLOR, 0, 0.5, 1, 1)
+			_equationMaterial.setUniformVec4(GLSLX_NAME_COLOR, color)
 			_context.setPremultipliedBlendState
 			_context.draw(.TRIANGLE_STRIP, _equationMaterial, _screenQuad)
 		}
@@ -360,7 +361,7 @@ class Canvas :: Layout.Renderer {
 		# Colors other than black must be rendered in two passes
 		if color.opaque != .BLACK {
 			_context.setAddBlendState
-			_textMaterial.setUniformVec4(GLSLX_NAME_COLOR, color.redF, color.greenF, color.blueF, color.alphaF)
+			_textMaterial.setUniformVec4(GLSLX_NAME_COLOR, color)
 			_context.draw(.TRIANGLE_STRIP, _textMaterial, _screenQuad)
 		}
 
@@ -379,12 +380,39 @@ class Canvas :: Layout.Renderer {
 }
 
 namespace Canvas {
+	var isDark = true
+
 	const GRID_FONT_SIZE = 16
 	const GRID_TICK_SIZE = 5
-	const SELECTION_COLOR = Color.new(0, 127, 255, 63)
-	const GRID_LIGHT_COLOR = Color.new(0, 0, 0, 31)
-	const GRID_DARK_COLOR = Color.new(0, 0, 0, 127)
 	const SCREEN_QUAD_FORMAT = GPU.VertexFormat.new.add(GLSLX_NAME_POSITION2, .FLOAT, 2)
+
+	def CLEAR_COLOR Color {
+		return isDark ? Color.new(63, 63, 63) : .WHITE
+	}
+
+	def EQUATION_COLOR Color {
+		return isDark ? Color.new(255, 191, 0) : Color.new(0, 127, 255)
+	}
+
+	def SELECTION_COLOR Color {
+		return isDark ? Color.new(127, 191, 255, 63) : Color.new(0, 127, 255, 63)
+	}
+
+	def ERROR_COLOR Color {
+		return isDark ? Color.new(255, 63, 63) : .RED
+	}
+
+	def GRID_SOLID_COLOR Color {
+		return isDark ? .WHITE : .BLACK
+	}
+
+	def GRID_LIGHT_COLOR Color {
+		return isDark ? Color.new(255, 255, 255, 31) : Color.new(0, 0, 0, 31)
+	}
+
+	def GRID_DARK_COLOR Color {
+		return isDark ? Color.new(255, 255, 255, 127) : Color.new(0, 0, 0, 127)
+	}
 
 	# 6x subpixel AA pattern
 	#

@@ -8,6 +8,7 @@ class HTMLPlatform :: Platform {
 	var _context GPU.HTMLContext = null
 	var _delegate Platform.Delegate = null
 	var _hasFocus = true
+	var _isDarkMode = false
 
 	def new {
 		try {
@@ -29,6 +30,15 @@ class HTMLPlatform :: Platform {
 				_delegate.handleFocusChange
 			}
 		}
+
+		var darkMode = matchMedia("(prefers-color-scheme: dark)")
+		_isDarkMode = darkMode.matches
+		darkMode.addListener(=> {
+			if _delegate != null {
+				_isDarkMode = darkMode.matches
+				_delegate.handleDarkModeChange(_isDarkMode)
+			}
+		})
 
 		var resize = => {
 			var width = window.innerWidth
@@ -328,6 +338,9 @@ class HTMLPlatform :: Platform {
 
 	def setDelegate(delegate Platform.Delegate) {
 		_delegate = delegate
+		if delegate != null {
+			delegate.handleDarkModeChange(_isDarkMode)
+		}
 	}
 
 	def setCursor(cursor Platform.Cursor) {

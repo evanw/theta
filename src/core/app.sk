@@ -388,6 +388,13 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		}
 	}
 
+	def handleDarkModeChange(isDarkMode bool) {
+		if isDarkMode != Canvas.isDark {
+			Canvas.isDark = isDarkMode
+			_invalidate
+		}
+	}
+
 	def _recompile {
 		var container = _editor.cloneContents
 		_log.clear
@@ -436,14 +443,14 @@ class App :: Platform.Delegate, Layout.Editor.Delegate {
 		_canvas.flushSmoothGeometry
 		_canvas.drawEquation(_equation)
 		_editor.render(_isCursorVisible ? .SHOW_CURSOR : .HIDE_CURSOR)
-		_canvas.flushText(.BLACK)
+		_canvas.flushText(Canvas.GRID_SOLID_COLOR)
 		_canvas.flushSmoothGeometry
 
 		if _log.hasErrors {
 			var error = _log.errors.first
 			_editor.renderErrorForRange(error.range.start, error.range.end)
 			_canvas.addText("Error: " + error.message, EDITOR_PADDING, _editor.box.y + _editor.box.height + EDITOR_PADDING, Layout.Element.MIN_FONT_SIZE, .PREFER_NORMAL)
-			_canvas.flushText(.RED)
+			_canvas.flushText(Canvas.ERROR_COLOR)
 			_canvas.flushSmoothGeometry
 		}
 

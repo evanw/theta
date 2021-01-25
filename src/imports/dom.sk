@@ -501,6 +501,29 @@ if TARGET == .JAVASCRIPT {
 			const warn dynamic
 			const error dynamic
 		}
+
+		class MediaQueryList {
+			const matches bool
+			const media string
+
+			def addListener(listener fn()) {
+				try {
+					HTML.on(self, "change", listener)
+				} catch {
+					(self as dynamic).addListener(listener)
+				}
+			}
+
+			def removeListener(listener fn()) {
+				try {
+					HTML.off(self, "change", listener)
+				} catch {
+					(self as dynamic).removeListener(listener)
+				}
+			}
+		}
+
+		def matchMedia(mediaQueryString string) MediaQueryList
 	}
 
 	class HTMLElement {

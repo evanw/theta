@@ -33,6 +33,7 @@ interface Platform.Delegate {
 	def handleShortcut(shortcut Shortcut)
 	def handleCodePoint(codePoint int)
 	def handleFocusChange
+	def handleDarkModeChange(isDarkMode bool)
 }
 
 enum Platform.Shortcut {
