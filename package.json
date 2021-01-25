@@ -1,8 +1,8 @@
 {
   "dependencies": {
     "fast-watch": "1.0.0",
-    "glslx": "0.1.19",
+    "glslx": "0.2.12",
     "opentype.js": "0.6.0",
-    "skew": "0.7.38"
+    "skew": "0.9.19"
   }
 }
