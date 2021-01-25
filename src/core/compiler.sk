@@ -10,12 +10,21 @@ namespace Equation {
 			_functions = {}
 
 			var source = _compile(node)
-			var functions = ""
+			var functions = "uniform float nan;" # NaN must be passed in so the driver doesn't remove it
 
 			if "log10" in _functions {
 				functions +=
 					"float log10(float x){" +
 						"return log(x)/log(10.);" +
+					"}"
+			}
+
+			if "_pow" in _functions {
+				functions +=
+					"float _pow(float x,float y){" +
+						"return " +
+							"y!=ceil(y)?x<0.?nan:pow(max(x,0.),y):" +
+							"y==0.?1.:pow(x,y-1.)*x;" +
 					"}"
 			}
 
@@ -168,7 +177,8 @@ namespace Equation {
 				}
 
 				case .EXPONENT {
-					return "pow(" + _compile(node.binaryLeft) + "," + _compile(node.binaryRight) + ")"
+					_functions["_pow"] = 0
+					return "_pow(" + _compile(node.binaryLeft) + "," + _compile(node.binaryRight) + ")"
 				}
 
 				case .FACTORIAL {
@@ -211,8 +221,8 @@ namespace Equation {
 		def _compileVariableArgumentCall(name string, argument Node) string {
 			assert(argument.nextSibling != null)
 			return name + "(" + _compile(argument) + "," + (argument.nextSibling.nextSibling == null
-				? _compile(argument.nextSibling) :
-				_compileVariableArgumentCall(name, argument.nextSibling)) + ")"
+				? _compile(argument.nextSibling)
+				: _compileVariableArgumentCall(name, argument.nextSibling)) + ")"
 		}
 	}
 

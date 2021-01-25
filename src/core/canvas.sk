@@ -306,6 +306,7 @@ class Canvas :: Layout.Renderer {
 				_compiler.hideCurve ? 0 : (_compiler.shadeAreaUnderCurve ? -2 : 2) * _platform.density)
 			_equationMaterial.setUniformMat3(GLSLX_NAME_MATRIX3, _transformA)
 			_equationMaterial.setUniformVec4(GLSLX_NAME_COLOR, color)
+			_equationMaterial.setUniformFloat("nan", Math.NAN)
 			_context.setPremultipliedBlendState
 			_context.draw(.TRIANGLE_STRIP, _equationMaterial, _screenQuad)
 		}
