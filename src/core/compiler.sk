@@ -12,10 +12,17 @@ namespace Equation {
 			var source = _compile(node)
 			var functions = "uniform float nan;" # NaN must be passed in so the driver doesn't remove it
 
+			if "loge" in _functions {
+				functions +=
+					"float loge(float x){" +
+						"return x<=0.?nan:log(x);" +
+					"}"
+			}
+
 			if "log10" in _functions {
 				functions +=
 					"float log10(float x){" +
-						"return log(x)/log(10.);" +
+						"return x<=0.?nan:log(x)/log(10.);" +
 					"}"
 			}
 
@@ -241,7 +248,7 @@ namespace Equation {
 	namespace GLSLCompiler {
 		const SUBSTITUTIONS = {
 			"e" : "2.718281828459045",
-			"ln" : "log",
+			"ln" : "loge",
 			"log" : "log10",
 			"Γ" : "gamma",
 			"θ" : "theta",
