@@ -90,7 +90,7 @@ function process(options) {
 	var descender = 0;
 	var units = options.unitsPerEm;
 
-	options.inputs.forEach(function(input) {
+	options.inputs.forEach(function (input) {
 		var font = opentype.loadSync(input.path);
 		ascender += font.ascender / font.unitsPerEm * units;
 		descender += font.descender / font.unitsPerEm * units;
@@ -135,7 +135,7 @@ function process(options) {
 		bytes.push.apply(bytes, glyphs[i].path);
 	}
 
-	var buffer = new Buffer(bytes);
+	var buffer = Buffer.from(bytes);
 	fs.writeFileSync(options.output, buffer);
 }
 
