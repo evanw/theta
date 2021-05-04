@@ -21,10 +21,22 @@ namespace Equation {
 
 			if "_pow" in _functions {
 				functions +=
+					# Note: "pow" can be implemented as "pow(x, y) = exp2(y * log2(x))" and
+					# "log" is only defined for positive values, so negative values are not
+					# reliable and should be avoided.
 					"float _pow(float x,float y){" +
 						"return " +
-							"y!=ceil(y)?x<0.?nan:pow(max(x,0.),y):" +
-							"y==0.?1.:pow(x,y-1.)*x;" +
+
+							# Is this a non-integer exponent?
+							"y!=ceil(y)?" +
+								"x<0.?nan:" + # Numbers less than 0 are nan
+								"pow(x,y)" + # Otherwise just use a normal "pow" call
+
+							# Otherwise, this is an integer exponent
+							":" +
+								"y==0.?1.:" + # An exponent of 0 is always 1
+								"y*.5!=floor(y*.5)?pow(abs(x),y-1.)*x:" + # Handle odd exponents
+								"pow(abs(x),y);" + # Handle even exponents
 					"}"
 			}
 
